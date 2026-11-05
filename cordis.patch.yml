@@ -1,0 +1,5 @@
+- insert:
+    - id: dsh-neocortex
+      name: 'dsh-neocortex'
+      config:
+        probeOnStart: false

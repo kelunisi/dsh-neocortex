@@ -1,0 +1,23 @@
+{
+  "name": "kelunisi",
+  "title": "Kelunisi's DSH Plugins",
+  "plugins": [
+    {
+      "name": "dsh-neocortex",
+      "title": "Zhinao (Neocortex) — layered Markdown memory",
+      "description": "Markdown-authoritative second brain with local recall ledger, lifecycle, weekly review and Web panel.",
+      "keywords": ["memory", "knowledge-base", "zhinao", "obsidian"],
+      "versions": [
+        {
+          "version": "0.4.0",
+          "dist": {
+            "tarball": "https://registry.npmjs.org/dsh-neocortex/-/dsh-neocortex-0.4.0.tgz"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.5"
+          }
+        }
+      ]
+    }
+  ]
+}

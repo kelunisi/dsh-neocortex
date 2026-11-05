@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Local plugin data — the recall ledger must never be committed
+.data/
+
+# Release artifacts
+*.tgz
+
+# Test / verification sandboxes and acceptance evidence
+sandbox/
+evidence/
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,60 @@
+{
+  "name": "dsh-neocortex",
+  "version": "0.4.0",
+  "description": "Zhinao (second brain) for DeepSeek Harness: layered Markdown memory with a local recall ledger, lifecycle engine, weekly review and a Web panel.",
+  "type": "module",
+  "license": "MIT",
+  "author": "kelunisi",
+  "homepage": "https://github.com/kelunisi/dsh-neocortex#readme",
+  "repository": "kelunisi/dsh-neocortex",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "plugin",
+    "memory",
+    "knowledge-base",
+    "zhinao",
+    "obsidian",
+    "markdown"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "src/**/*.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "templates/**/*",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "SECURITY.md"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node scripts/check.mjs"
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  }
+}
