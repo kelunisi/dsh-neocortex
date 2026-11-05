@@ -18,8 +18,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Ensure npm supports OIDC trusted publishing
+        run: |
+          npm install -g npm@^11.5.1
+          npm --version
+
       - name: Publish (OIDC trusted publishing, no token needed)
-        run: npm publish --provenance --access public
+        run: npm publish --access public
