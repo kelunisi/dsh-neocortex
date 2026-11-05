@@ -1,5 +1,8 @@
 # dsh-neocortex（智脑）
 
+[![npm version](https://img.shields.io/npm/v/dsh-neocortex)](https://www.npmjs.com/package/dsh-neocortex)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 智脑（第二大脑）—— DeepSeek Harness 的 Markdown 权威记忆插件：本地召回账本、生命周期引擎、周回顾与 Web 面板。
 
 ## 功能特性

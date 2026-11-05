@@ -1,5 +1,8 @@
 # dsh-neocortex
 
+[![npm version](https://img.shields.io/npm/v/dsh-neocortex)](https://www.npmjs.com/package/dsh-neocortex)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Zhinao (Neocortex) — a Markdown-authoritative second brain for DeepSeek Harness, with a local recall ledger, lifecycle engine, weekly review and a Web panel.
 
 ## Features
