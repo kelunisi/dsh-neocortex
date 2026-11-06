@@ -40,3 +40,10 @@ export function truncateUnicode(text, maxChars) {
   const chars = Array.from(text);
   return chars.length <= maxChars ? text : chars.slice(0, Math.max(0, maxChars)).join('');
 }
+
+// DSH 0.2.2+ validates tool results as lossless JSON and rejects undefined
+// fields, NaN and Infinity. Round-trip through JSON to normalize tool outputs.
+export function sanitize(value) {
+  if (value === undefined || value === null) return value;
+  return JSON.parse(JSON.stringify(value));
+}

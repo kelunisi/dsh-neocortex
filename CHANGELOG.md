@@ -31,3 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes
 
 - 0.4.1 was published entirely by CI to validate the automated release pipeline end to end.
+
+## [0.4.2] - 2026-11-06
+
+### Fixed
+
+- Tool results are normalized to lossless JSON before returning. `neocortex_remember` no longer fails on DSH 0.2.2+ with `value is not lossless JSON` when no prior entry was replaced (the report carried `tombstoneId: undefined`). Memory writes were always correct; only the tool report was rejected by the stricter DSH 0.2.2 output validation.
+
+### Notes
+
+- Compatibility verified on DSH 0.2.2-rc.1: plugin load, systemPrompt injection, and all three tools (`neocortex_remember` / `neocortex_recall` / `neocortex_panel`) behave as on 0.2.1-rc.5.

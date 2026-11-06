@@ -1,6 +1,6 @@
 {
   "name": "dsh-neocortex",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Zhinao (second brain) for DeepSeek Harness: layered Markdown memory with a local recall ledger, lifecycle engine, weekly review and a Web panel.",
   "type": "module",
   "license": "MIT",

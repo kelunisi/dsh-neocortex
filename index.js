@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Ledger } from './src/ledger.js';
 import { NeocortexRuntime } from './src/runtime.js';
-import { DEFAULT_CONFIG, resolveConfig } from './src/defaults.js';
+import { DEFAULT_CONFIG, resolveConfig, sanitize } from './src/defaults.js';
 import { runP1HostProbe } from './src/p1-host-probe.js';
 import { MemoryWriter } from './src/writer.js';
 import { routeRecallMiss } from './src/recall.js';
@@ -129,7 +129,7 @@ export function apply(ctx, rawConfig = {}) {
       if (!policy.allowSave) return { status: 'rejected', reason: 'user-opt-out' };
       const verifiedExplicit = policy.explicit;
       const result = writer.remember({ ...args, explicit: verifiedExplicit }, { sessionId: exec.agent?.id });
-      return { ...result, explicitVerified: verifiedExplicit };
+      return sanitize({ ...result, explicitVerified: verifiedExplicit });
     },
   });
 
@@ -151,7 +151,7 @@ export function apply(ctx, rawConfig = {}) {
       if (!memoryPolicy(userText).allowRead) return { kind: 'rejected', reason: 'user-opt-out' };
       const result = await routeRecallMiss({ brainRoot, query: args.query });
       if (result.results) result.results = result.results.slice(0, 10).map((entry) => ({ date: entry.date, text: entry.text, path: entry.sourcePath, status: entry.status }));
-      return result;
+      return sanitize(result);
     },
   });
 
@@ -189,7 +189,7 @@ export function apply(ctx, rawConfig = {}) {
       if (!policy.allowRead || (!isPanelReadAction(args.action) && !policy.allowSave)) {
         return { status: 'rejected', reason: 'user-opt-out' };
       }
-      return executePanelTool(panel, args, exec.agent?.id);
+      return sanitize(await executePanelTool(panel, args, exec.agent?.id));
     },
   });
 

@@ -9,6 +9,15 @@
       "keywords": ["memory", "knowledge-base", "zhinao", "obsidian"],
       "versions": [
         {
+          "version": "0.4.2",
+          "dist": {
+            "tarball": "https://registry.npmjs.org/dsh-neocortex/-/dsh-neocortex-0.4.2.tgz"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.5"
+          }
+        },
+        {
           "version": "0.4.1",
           "dist": {
             "tarball": "https://registry.npmjs.org/dsh-neocortex/-/dsh-neocortex-0.4.1.tgz"

@@ -6,6 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 import { brainState, initializeBrain, listTemplateFiles, planInitialization } from '../src/setup.js';
+import { sanitize } from '../src/defaults.js';
 
 function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'neocortex-release-'));
@@ -191,4 +192,16 @@ test('REL-08 upgrade fills missing skeleton files and never touches existing one
   const rejected = initializeBrain({ mode: 'upgrade', targetDir: foreign, templateRoot });
   assert.equal(rejected.status, 'invalid');
   assert.match(rejected.reason, /^not-a-brain:/);
+});
+
+test('REL-09 sanitize normalizes tool outputs to lossless JSON', () => {
+  assert.equal(sanitize(undefined), undefined);
+  assert.equal(sanitize(null), null);
+  const cleaned = sanitize({ status: 'written', tombstoneId: undefined, quota: { total: 1, extras: undefined, writes: [] }, ratio: NaN });
+  assert.deepEqual(Object.keys(cleaned).sort(), ['quota', 'ratio', 'status']);
+  assert.equal('tombstoneId' in cleaned, false, 'undefined fields are stripped');
+  assert.deepEqual(Object.keys(cleaned.quota).sort(), ['total', 'writes']);
+  assert.equal(cleaned.ratio, null, 'NaN normalizes to null');
+  const roundTrip = JSON.parse(JSON.stringify(cleaned));
+  assert.deepEqual(roundTrip, cleaned, 'sanitized value survives lossless JSON round-trip');
 });

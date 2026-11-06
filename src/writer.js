@@ -204,7 +204,9 @@ export class MemoryWriter {
       this.ledger.state.facts[request.factKey] = fact;
     }
     this.ledger.save();
-    return { status: previous ? 'replaced' : 'written', id: entry.id, path: relative, quota: this.quota(day), tombstoneId: result.tombstoneId };
+    const report = { status: previous ? 'replaced' : 'written', id: entry.id, path: relative, quota: this.quota(day) };
+    if (result.tombstoneId) report.tombstoneId = result.tombstoneId;
+    return report;
   }
 
   replaceOrInsert({ previous, line, targetPath, date, sessionId, action }) {
