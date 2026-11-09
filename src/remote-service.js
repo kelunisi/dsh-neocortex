@@ -1,5 +1,9 @@
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { loadQueue, saveQueue } from './watch/queue.js';
+import { acceptItems, rejectItems } from './watch/ingest.js';
+import { loadSchedulerState } from './watch/scheduler.js';
+import { loadBudget } from './watch/budget.js';
 
 function loadProtocol() {
   const localRequire = createRequire(import.meta.url);
@@ -35,18 +39,57 @@ function remoteMethod(Type, name) {
 }
 
 export class NeocortexRemoteService extends TypertRemoteService {
-  constructor(ctx, panel, watch) {
+  constructor(ctx, panel, watch, { dataDir, writer } = {}) {
     super(ctx, 'neocortex', { namespace: 'neocortex' });
     this.panel = panel;
     this.watch = watch;
+    this.dataDir = dataDir;
+    this.writer = writer;
   }
 
   state() {
-    return json({ ...this.panel.state(), watch: this.watch.state() });
+    return json({
+      ...this.panel.state(),
+      watch: this.watch.state(),
+      watchQueue: loadQueue(this.dataDir),
+      watchScheduler: loadSchedulerState(this.dataDir),
+      watchBudget: loadBudget(this.dataDir),
+    });
+  }
+
+  watchDecide(request) {
+    const queue = loadQueue(this.dataDir);
+    const ids = Array.isArray(request?.ids) && request.ids.length ? request.ids : (request?.all ? null : []);
+    if (!Array.isArray(ids) && !request?.all) return json({ ok: false, reason: 'ids-required' });
+    if (request?.decision === 'accept') {
+      if (!this.writer) return json({ ok: false, reason: 'writer-unavailable' });
+      const result = acceptItems({ writer: this.writer, queue, dataDir: this.dataDir, sessionId: 'watch-panel', ids: ids || undefined });
+      saveQueue(this.dataDir, queue);
+      return json({ ok: true, decision: 'accept', ...result, remaining: queue.items.filter((item) => item.status === 'pending').length });
+    }
+    if (request?.decision === 'reject') {
+      const result = rejectItems({ queue, ids: ids || undefined, note: request?.note });
+      saveQueue(this.dataDir, queue);
+      return json({ ok: true, decision: 'reject', ...result, remaining: queue.items.filter((item) => item.status === 'pending').length });
+    }
+    return json({ ok: false, reason: 'unknown-decision' });
+  }
+
+  updateWatchConfig(request) {
+    return json(this.watch.setConfig(request || {}));
   }
 
   updateWatch(request) {
     return json(this.watch.setMode(request?.mode));
+  }
+
+  watchOverview() {
+    return json({
+      watch: this.watch.state(),
+      queue: loadQueue(this.dataDir),
+      scheduler: loadSchedulerState(this.dataDir),
+      budget: loadBudget(this.dataDir),
+    });
   }
 
   previewReview(request) {
@@ -86,6 +129,6 @@ export class NeocortexRemoteService extends TypertRemoteService {
   }
 }
 
-for (const name of ['state', 'previewReview', 'confirmL1', 'undo', 'acceptReview', 'rejectReview', 'manualReview', 'retryReview', 'updateSettings', 'initializeBrain', 'updateWatch']) {
+for (const name of ['state', 'previewReview', 'confirmL1', 'undo', 'acceptReview', 'rejectReview', 'manualReview', 'retryReview', 'updateSettings', 'initializeBrain', 'updateWatch', 'watchOverview', 'watchDecide', 'updateWatchConfig']) {
   remoteMethod(NeocortexRemoteService, name);
 }

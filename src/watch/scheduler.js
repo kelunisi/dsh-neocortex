@@ -88,7 +88,7 @@ export function planMissed(plan, now, graceMs = GRACE_MS) {
 }
 
 export class WatchScheduler {
-  constructor({ dataDir, watch, run, now = () => new Date(), random = Math.random, log = () => {}, pendingCount = () => 0 }) {
+  constructor({ dataDir, watch, run, now = () => new Date(), random = Math.random, log = () => {}, pendingCount = () => 0, budgetRemaining = () => Infinity }) {
     this.dataDir = dataDir;
     this.watch = watch;
     this.run = run;
@@ -96,6 +96,7 @@ export class WatchScheduler {
     this.random = random;
     this.log = log;
     this.pendingCount = pendingCount;
+    this.budgetRemaining = budgetRemaining;
     this.timer = null;
     this.running = false;
   }
@@ -120,6 +121,7 @@ export class WatchScheduler {
     const state = loadSchedulerState(this.dataDir);
     const plan = ensureDayPlan(state, day, this.random);
     saveSchedulerState(this.dataDir, state);
+    const budgetLeft = Number(this.budgetRemaining?.() ?? Infinity);
 
     // 21:00 判定提醒（队列有待判才记）
     if (now.getHours() >= JUDGMENT_HOUR && !state.judgmentNotified[day] && this.pendingCount() > 0) {
@@ -137,6 +139,13 @@ export class WatchScheduler {
         saveSchedulerState(this.dataDir, state);
         this.log(`今天开摆（30%），不跑`);
       }
+      return;
+    }
+    if (budgetLeft <= 0) {
+      state.lastRunDay = day;
+      state.lastResult = { kind: 'budget-stop', day, remaining: budgetLeft, at: new Date().toISOString() };
+      saveSchedulerState(this.dataDir, state);
+      this.log('token 预算已用完，今天不跑');
       return;
     }
     if (planMissed(plan, now)) {

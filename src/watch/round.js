@@ -6,6 +6,7 @@
 import { loadCriteria, directionTokens } from './criteria.js';
 import { loadCalibration } from './calibration.js';
 import { buildQueue } from './queue.js';
+import { recordUsage } from './budget.js';
 import { createBiliClient } from './bili.js';
 import { dedupeVideos, pickCandidates, selectDeep } from './triage.js';
 import { normalizeSubtitle, resolveModelRoute, understandVideo } from './understand.js';
@@ -89,6 +90,7 @@ export async function runDryRound({
     });
     const deepPicks = selectDeep(picked, config.deepPerRound || 3);
     const deepById = new Map();
+    let estimatedTokens = 0;
     for (const entry of deepPicks) {
       if (signal?.aborted) throw new Error('已取消');
       let subtitle = '';
@@ -100,6 +102,7 @@ export async function runDryRound({
       }
       const judgement = await understandVideo({ ctx, llm: model, route: modelRoute, criteria, video: entry.video, subtitle, examples, signal });
       deepById.set(entry.video.bvid, judgement);
+      estimatedTokens += Math.ceil((subtitle.length || 0) / 2) + 1200;
       log(`判读 ${entry.video.bvid}：${judgement.worth === true ? '值得收' : judgement.worth === false ? '跳过' : '待定'}`);
     }
 
@@ -113,10 +116,12 @@ export async function runDryRound({
       now,
     });
     const queue = buildQueue({ dataDir, date: localDay(now), picked, deepById });
+    const usage = recordUsage(dataDir, estimatedTokens);
     return {
       ok: true,
       ...report,
       queue: { file: queue.file, count: queue.items.length },
+      usage: { estimated: estimatedTokens, day: usage.date, used: usage.used },
       route: modelRoute,
       queries,
       exploreQueries,

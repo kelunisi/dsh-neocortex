@@ -69,7 +69,7 @@ export function apply(ctx, rawConfig = {}) {
     vendorDir: path.join(packageRoot, 'vendor', 'bilibili-mcp'),
     writer,
   });
-  new NeocortexRemoteService(ctx, panel, watch);
+  new NeocortexRemoteService(ctx, panel, watch, { dataDir, writer });
   const runtime = new NeocortexRuntime({
     ledger,
     brainRoot,

@@ -7,6 +7,7 @@
 
 import { WatchService } from './service.js';
 import { WatchScheduler } from './scheduler.js';
+import { remainingBudget } from './budget.js';
 import { pendingItems, loadQueue } from './queue.js';
 import { runDryRound } from './round.js';
 import { registerWatchTools } from './tools.js';
@@ -26,6 +27,7 @@ export function mountWatch({ ctx, dataDir, initialMode, config = {}, vendorDir, 
     dataDir,
     watch,
     pendingCount: () => pendingItems(loadQueue(dataDir)).length,
+    budgetRemaining: () => remainingBudget(dataDir, watch.config.tokenBudgetPerDay ?? 2000000),
     log: (line) => console.error('[watch]', line),
     run: async ({ reason }) => {
       // agent 档的受限会话装配在 P4.5；在此之前自动跑先走 code 管线，产物契约不变。

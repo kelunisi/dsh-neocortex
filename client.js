@@ -22,7 +22,7 @@ window.__ModuleLoader__.load({
       setupCurrent: '当前脑库', setupMissing: '目录不存在', setupEmpty: '空目录', setupUnrecognized: '非空但缺少智脑特征', setupNotDir: '路径不是目录',
       setupNew: '新建智脑', setupTakeover: '使用已有智脑', setupUpgrade: '升级补齐骨架', setupDirPlaceholder: '目录路径，留空用默认',
       setupStart: '执行', setupDoneNew: '新建完成', setupDoneTakeover: '接管完成', setupDoneUpgrade: '补齐完成', setupRestart: '重启插件后生效',
-      watchTab: '喂养', watchTitle: '喂养模块', watchPhase: 'P1 骨架 · 只有开关，没有抓取、没有发送',
+      watchTab: '喂养', watchTitle: '喂养模块', watchPhase: '自动跑 + 收/扔 + 预算；面板与悬浮球为 P7',
       watchCurrent: '当前模式', watchOff: '关闭', watchCode: '代码模式', watchAgent: 'Agent 模式',
       watchOffDesc: '一键停：不起进程、不花 token、历史数据不动。',
       watchCodeDesc: '代码跑腿，模型只判断（推荐）。抓取从 P2 接入。',
@@ -30,6 +30,11 @@ window.__ModuleLoader__.load({
       watchSaved: '喂养开关已保存。', watchQueue: '待确认卡片',
       watchEmptyQueue: '还没有待确认卡片——P1 阶段不抓取内容。',
       watchData: '状态文件', watchEnabled: '已开启', watchDisabled: '已关闭',
+      watchPending: '待判', watchAccept: '收', watchReject: '扔', watchAllAccept: '全部收', watchAllReject: '全部扔',
+      watchQueueEmpty: '队列为空，下一轮跑完会出现在这里。', watchBudget: '今日预算', watchUsed: '已用', watchRemaining: '剩余',
+      watchScan: '每轮扫几条', watchDeep: '每轮深读几条', watchToken: '日 token 预算',
+      watchSchedule: '自动调度', watchLast: '上次结果', watchNext: '下次', watchNotScheduled: '未安排',
+      watchFloatTitle: '今晚待判', watchClose: '收起', watchSaveWatch: '保存喂养参数', watchSavedWatch: '喂养参数已保存',
     };
     const en = {
       tab: 'Neocortex', title: 'Neocortex Memory', subtitle: 'Markdown is authoritative; the ledger explains recall and lifecycle.',
@@ -47,7 +52,7 @@ window.__ModuleLoader__.load({
       setupCurrent: 'Current brain', setupMissing: 'Directory missing', setupEmpty: 'Empty directory', setupUnrecognized: 'Non-empty but no brain markers', setupNotDir: 'Path is not a directory',
       setupNew: 'Create new brain', setupTakeover: 'Use existing brain', setupUpgrade: 'Upgrade skeleton', setupDirPlaceholder: 'Directory path; blank uses default',
       setupStart: 'Run', setupDoneNew: 'Created', setupDoneTakeover: 'Taken over', setupDoneUpgrade: 'Upgraded', setupRestart: 'Restart the plugin to take effect',
-      watchTab: 'Feeding', watchTitle: 'Feeding module', watchPhase: 'P1 skeleton — the switch only; no harvesting, no sending.',
+      watchTab: 'Feeding', watchTitle: 'Feeding module', watchPhase: 'Automatic rounds, accept/drop and budgets; the floating panel is P7.',
       watchCurrent: 'Current mode', watchOff: 'Off', watchCode: 'Code', watchAgent: 'Agent',
       watchOffDesc: 'Stop everything: no process, no tokens, history untouched.',
       watchCodeDesc: 'Code does the legwork, the model only judges (recommended). Harvest lands in P2.',
@@ -55,6 +60,11 @@ window.__ModuleLoader__.load({
       watchSaved: 'Feeding switch saved.', watchQueue: 'Pending cards',
       watchEmptyQueue: 'No pending cards yet — P1 does not harvest anything.',
       watchData: 'State file', watchEnabled: 'Enabled', watchDisabled: 'Disabled',
+      watchPending: 'Pending', watchAccept: 'Keep', watchReject: 'Drop', watchAllAccept: 'Keep all', watchAllReject: 'Drop all',
+      watchQueueEmpty: 'Queue is empty; the next round will fill it.', watchBudget: 'Today budget', watchUsed: 'Used', watchRemaining: 'Remaining',
+      watchScan: 'Scan per round', watchDeep: 'Deep reads per round', watchToken: 'Daily token budget',
+      watchSchedule: 'Scheduler', watchLast: 'Last result', watchNext: 'Next', watchNotScheduled: 'Not scheduled',
+      watchFloatTitle: 'Pending review', watchClose: 'Collapse', watchSaveWatch: 'Save feeding settings', watchSavedWatch: 'Feeding settings saved',
     };
 
     const jsonCodec = {
@@ -68,6 +78,7 @@ window.__ModuleLoader__.load({
       state: false, previewReview: true, confirmL1: true, undo: true,
       acceptReview: true, rejectReview: true, manualReview: false, retryReview: false,
       updateSettings: true, initializeBrain: true, updateWatch: true,
+      watchOverview: false, watchDecide: true, updateWatchConfig: true,
     };
     const TYPERT_REMOTE = {
       package: 'dsh-neocortex',
@@ -101,6 +112,18 @@ window.__ModuleLoader__.load({
       .nc-setting-control{display:flex;align-items:center;gap:9px}.nc-range{width:100%;accent-color:var(--dsw-alias-brand-primary)}.nc-setting-output{min-width:36px;text-align:right;font-variant-numeric:tabular-nums}
       .nc-input{width:100%;box-sizing:border-box;margin:10px 0;border:1px solid var(--dsw-alias-border-l2);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);padding:7px 10px;font:inherit}
       .nc-preview{white-space:pre-wrap;max-height:300px;overflow:auto;background:var(--dsw-alias-bg-base);border-radius:7px;padding:10px;font-size:12px}
+      .wf-root{position:fixed;right:24px;bottom:130px;z-index:2147483000}
+      .wf-ball{width:46px;height:46px;border-radius:50%;border:1px solid var(--dsw-alias-brand-primary);background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+      .wf-panel{position:absolute;right:0;bottom:58px;width:min(380px,calc(100vw - 40px));max-height:520px;display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.3);color:var(--dsw-alias-label-primary);font-size:13px}
+      .wf-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+      .wf-list{overflow:auto;padding:6px 12px}
+      .wf-item{padding:9px 0;border-bottom:1px dashed var(--dsw-alias-border-l1)}
+      .wf-item:last-child{border-bottom:0}
+      .wf-title{font-weight:600;margin-bottom:2px}
+      .wf-meta{color:var(--dsw-alias-label-secondary);font-size:11.5px}
+      .wf-points{margin:5px 0 0;padding-left:17px;color:var(--dsw-alias-label-secondary);font-size:12px}
+      .wf-foot{display:flex;gap:8px;justify-content:flex-end;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l1)}
+      .nc-watch-slider{display:grid;grid-template-columns:minmax(160px,1fr) 1fr 54px;gap:10px;align-items:center;margin:10px 0}
       @media(max-width:720px){.nc-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.nc-header{display:block}.nc-header .nc-btn{margin-top:10px}}
     `;
 
@@ -123,12 +146,14 @@ window.__ModuleLoader__.load({
         const [draft, setDraft] = useState({});
         const [setupMode, setSetupMode] = useState('new');
         const [setupDir, setSetupDir] = useState('');
+        const [watchDraft, setWatchDraft] = useState({});
 
         const load = async () => {
           try {
             const value = await call('state');
             setState(value);
             setDraft(Object.fromEntries(Object.keys(value.settingRanges).map((key) => [key, value.settings[key]])));
+            setWatchDraft({ ...(value.watch?.config || {}) });
             setError('');
           }
           catch (cause) { setError(cause?.message || String(cause)); }
@@ -173,12 +198,45 @@ window.__ModuleLoader__.load({
                 }
               }) }, t('setupStart'))))) : null;
 
-        const watch = state.watch || { mode: 'off', enabled: false, file: '', modes: ['off', 'code', 'agent'] };
+        const watch = state.watch || { mode: 'off', enabled: false, file: '', modes: ['off', 'code', 'agent'], config: {}, ranges: {} };
         const modeButton = (mode, label) => h(Button, {
           primary: watch.mode === mode, disabled: busy,
           onClick: safely(async () => { await act('updateWatch', { mode }); setMessage(t('watchSaved')); }),
         }, label);
         const modeDescription = watch.mode === 'off' ? t('watchOffDesc') : watch.mode === 'code' ? t('watchCodeDesc') : t('watchAgentDesc');
+        const pendingQueue = (state.watchQueue?.items || []).filter((item) => item.status === 'pending');
+        const watchBudget = state.watchBudget || { used: 0 };
+        const scheduler = state.watchScheduler || {};
+        const last = scheduler.lastResult;
+        const schedulerText = last
+          ? `${t('watchLast')}: ${last.kind}${last.reason ? ` (${last.reason})` : ''}${last.at ? ` · ${last.at}` : ''}`
+          : t('watchNotScheduled');
+        const sliderSpecs = [
+          ['scanPerRound', t('watchScan')],
+          ['deepPerRound', t('watchDeep')],
+          ['tokenBudgetPerDay', t('watchToken')],
+        ];
+        const watchSliders = sliderSpecs.map(([key, label]) => {
+          const range = (watch.ranges && watch.ranges[key]) || (key === 'tokenBudgetPerDay' ? [100000, 5000000] : [1, 10]);
+          return h('label', { className: 'nc-watch-slider', key },
+            h('span', null, label, h('small', null, `${range[0]}–${range[1]}`)),
+            h('input', {
+              className: 'nc-range', type: 'range', min: range[0], max: range[1],
+              step: key === 'tokenBudgetPerDay' ? 100000 : 1,
+              value: watchDraft[key] ?? range[0],
+              onChange: (event) => setWatchDraft({ ...watchDraft, [key]: Number(event.target.value) }),
+            }),
+            h('output', { className: 'nc-setting-output' }, String(watchDraft[key] ?? '')));
+        });
+        const queueView = pendingQueue.length
+          ? pendingQueue.map((item) => h('article', { className: 'nc-card', key: item.id },
+            h('div', { className: 'nc-card-head' },
+              h('div', null, h('b', null, item.title), h('div', { className: 'nc-meta' }, `${item.up || ''} · ${item.duration || ''} · ${item.bvid}`))),
+            item.points?.length ? h('ul', null, item.points.map((point, index) => h('li', { key: index }, point))) : h('div', { className: 'nc-note' }, '暂无要点；收之前会尝试补深读'),
+            h('div', { className: 'nc-actions' },
+              h(Button, { primary: true, disabled: busy, onClick: safely(async () => { await act('watchDecide', { decision: 'accept', ids: [item.id] }); setMessage(`${t('watchAccept')} ✓`); }) }, t('watchAccept')),
+              h(Button, { disabled: busy, onClick: safely(async () => { await act('watchDecide', { decision: 'reject', ids: [item.id] }); setMessage(`${t('watchReject')} ✓`); }) }, t('watchReject')))))
+          : h(Empty, null, t('watchQueueEmpty'));
         const watchView = h(React.Fragment, null,
           h(Section, { title: t('watchTitle'), note: t('watchPhase') },
             h('div', { className: 'nc-card' },
@@ -188,7 +246,12 @@ window.__ModuleLoader__.load({
               h('div', { className: 'nc-actions' }, modeButton('off', t('watchOff')), modeButton('code', t('watchCode')), modeButton('agent', t('watchAgent'))),
               h('p', { className: 'nc-note' }, modeDescription),
               h('div', { className: 'nc-meta nc-path' }, `${t('watchData')}: ${watch.file || '—'}`))),
-          h(Section, { title: t('watchQueue') }, h(Empty, null, t('watchEmptyQueue'))),
+          h(Section, { title: `${t('watchQueue')}（${pendingQueue.length}）` }, queueView),
+          h(Section, { title: t('watchSaveWatch') },
+            h('div', { className: 'nc-card' }, watchSliders,
+              h(Button, { primary: true, disabled: busy, onClick: safely(async () => { await act('updateWatchConfig', watchDraft); setMessage(t('watchSavedWatch')); }) }, t('watchSaveWatch')))),
+          h(Section, { title: t('watchSchedule'), note: schedulerText },
+            h('div', { className: 'nc-meta' }, `${t('watchBudget')}: ${watchBudget.used || 0} / ${watch.config?.tokenBudgetPerDay || watch.defaults?.tokenBudgetPerDay || '—'}`)),
         );
 
         const overview = h(React.Fragment, null,
@@ -260,6 +323,48 @@ window.__ModuleLoader__.load({
       };
     }
 
+    function createWatchFloat(call, t) {
+      return function WatchFloat() {
+        const [data, setData] = useState(null);
+        const [open, setOpen] = useState(false);
+        const [busy, setBusy] = useState(false);
+        const refresh = async () => {
+          try { const value = await call('watchOverview'); setData(value); }
+          catch { /* keep the last view */ }
+        };
+        useEffect(() => {
+          let alive = true;
+          const tick = async () => { if (alive) await refresh(); };
+          tick();
+          const timer = setInterval(tick, 60000);
+          return () => { alive = false; clearInterval(timer); };
+        }, []);
+        const pending = (data?.queue?.items || []).filter((item) => item.status === 'pending');
+        if (!data || !pending.length) return null;
+        const decide = async (decision, ids) => {
+          setBusy(true);
+          try { await call('watchDecide', { decision, ids }); await refresh(); }
+          catch { /* leave the item in place */ }
+          finally { setBusy(false); }
+        };
+        const rows = pending.map((item) => h('div', { className: 'wf-item', key: item.id },
+          h('div', { className: 'wf-title' }, item.title),
+          h('div', { className: 'wf-meta' }, `${item.up || ''} · ${item.duration || ''} · ${item.bvid}`),
+          item.points?.length ? h('ul', { className: 'wf-points' }, item.points.map((point, index) => h('li', { key: index }, point))) : null,
+          h('div', { className: 'nc-actions' },
+            h('button', { className: 'nc-btn', disabled: busy, onClick: () => decide('accept', [item.id]) }, t('watchAccept')),
+            h('button', { className: 'nc-btn', disabled: busy, onClick: () => decide('reject', [item.id]) }, t('watchReject')))));
+        return h('div', { className: 'wf-root' },
+          open ? h('div', { className: 'wf-panel' },
+            h('div', { className: 'wf-head' }, h('b', null, `${t('watchFloatTitle')} · ${pending.length}`), h('button', { className: 'nc-btn', onClick: () => setOpen(false) }, t('watchClose'))),
+            h('div', { className: 'wf-list' }, rows),
+            h('div', { className: 'wf-foot' },
+              h('button', { className: 'nc-btn', disabled: busy, onClick: () => decide('accept', pending.map((item) => item.id)) }, t('watchAllAccept')),
+              h('button', { className: 'nc-btn', disabled: busy, onClick: () => decide('reject', pending.map((item) => item.id)) }, t('watchAllReject')))) : null,
+          h('button', { className: 'wf-ball', 'aria-label': t('watchFloatTitle'), onClick: () => setOpen(!open) }, String(pending.length)));
+      };
+    }
+
     return {
       inject: ['slots', 'locale', 'remote'],
       apply(ctx) {
@@ -280,6 +385,15 @@ window.__ModuleLoader__.load({
           name: 'settings.plugins.tab', id: 'neocortex', order: 30,
           label: () => t('tab'), locale: 'neocortex',
         }, Panel));
+        try {
+          const WatchFloat = createWatchFloat(call, t);
+          ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+            name: 'shell.overlay', id: 'neocortex-watch-float', order: 80,
+            label: () => t('watchFloatTitle'),
+          }, WatchFloat));
+        } catch (error) {
+          console.error('[dsh-neocortex] watch overlay registration failed', error);
+        }
       },
     };
   },

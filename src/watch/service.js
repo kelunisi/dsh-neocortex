@@ -82,6 +82,7 @@ export class WatchService {
       file: this.file,
       repaired: [...this.repaired],
       defaults: { ...WATCH_DEFAULTS },
+      config: { ...this.config },
       ranges: Object.fromEntries(Object.entries(WATCH_RANGES).map(([key, range]) => [key, [...range]])),
       capabilities: {
         scheduler: false,
@@ -116,6 +117,32 @@ export class WatchService {
     this.readError = undefined;
     try { this.onModeChange?.(mode); } catch { /* listener failures must not break the switch */ }
     return { status: 'updated', ...this.state() };
+  }
+
+  /** P7 sliders: scan/deep/mention/dm/followings/token budget, clamped by WATCH_RANGES. */
+  setConfig(patch = {}) {
+    const next = { ...this.config };
+    const changed = [];
+    for (const [key, [min, max]] of Object.entries(WATCH_RANGES)) {
+      if (patch[key] === undefined) continue;
+      const value = Number(patch[key]);
+      if (!Number.isInteger(value)) continue;
+      const clamped = Math.min(max, Math.max(min, value));
+      if (clamped !== next[key]) changed.push(key);
+      next[key] = clamped;
+    }
+    if (patch.tokenBudgetPerDay !== undefined) {
+      const value = Math.max(100000, Math.min(5000000, Math.round(Number(patch.tokenBudgetPerDay) || 0)));
+      if (value !== next.tokenBudgetPerDay) changed.push('tokenBudgetPerDay');
+      next.tokenBudgetPerDay = value;
+    }
+    if (!changed.length) return { status: 'unchanged', ...this.state() };
+    const updatedAt = this.now().toISOString();
+    this.write({ schema: WATCH_SCHEMA, ...next, updatedAt });
+    this.config = next;
+    this.persisted = true;
+    this.updatedAt = updatedAt;
+    return { status: 'updated', changed, ...this.state() };
   }
 
   /** Release anything owned by the module. P1 owns no timer, so this is a no-op kept for P2+. */
