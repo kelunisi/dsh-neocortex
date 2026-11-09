@@ -59,7 +59,7 @@ export async function runSelftest({ dataDir, config = {}, vendorDir, install = f
         deps = { ok: false, detail: venv.detail || 'venv 创建失败' };
       } else {
         log('安装依赖（可能需要几分钟）…');
-        const installed = installDeps({ pythonPath: venv.python, dataDir });
+        const installed = installDeps({ pythonPath: venv.python, dataDir, indexUrl: config.pipIndexUrl });
         const checked = checkDeps(venv.python);
         deps = { ...checked, install: installed };
       }

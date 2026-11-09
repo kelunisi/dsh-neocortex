@@ -73,9 +73,16 @@ export function createBiliClient({ dataDir, config = {}, vendorDir, tools = READ
   }
   const client = new McpClient({
     command: runtime.command,
-    args: [],
+    args: [runtime.script],
     cwd: runtime.dir,
-    env: { BILI_MCP_TOOLS: tools.join(','), BILI_STYLE_OFF: '1' },
+    env: {
+      BILI_MCP_TOOLS: tools.join(','),
+      BILI_STYLE_OFF: '1',
+      // Windows 上 Python 默认按 GBK 编解码；中文/emoji 进管道会乱码甚至卡死。
+      PYTHONUTF8: '1',
+      PYTHONIOENCODING: 'utf-8',
+      PYTHONUNBUFFERED: '1',
+    },
     log,
   });
   return { client, runtime };

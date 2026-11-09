@@ -165,7 +165,7 @@ export function ensureVenv({ pythonPath, args = [], dataDir, timeoutMs = 180000 
 
 /** Import the five runtime packages in one interpreter run. */
 export function checkDeps(pythonPath, { timeoutMs = 60000 } = {}) {
-  const code = 'import bilibili_api, mcp, aiohttp, qrcode, PIL; print("ok", getattr(bilibili_api, "__version__", "?"))';
+  const code = 'import importlib.metadata as md; import bilibili_api, mcp, aiohttp, qrcode, PIL; print("ok", md.version("bilibili-api-python"), md.version("mcp"), md.version("aiohttp"))';
   const result = run(pythonPath, ['-c', code], { timeoutMs });
   return {
     ok: result.ok,
@@ -174,11 +174,16 @@ export function checkDeps(pythonPath, { timeoutMs = 60000 } = {}) {
   };
 }
 
-export function installDeps({ pythonPath, dataDir, timeoutMs = 900000 }) {
+export function installDeps({ pythonPath, dataDir, timeoutMs = 900000, indexUrl }) {
   const requirements = requirementsFile(dataDir);
   if (!fs.existsSync(requirements)) return { ok: false, detail: `缺少 ${requirements}` };
-  const result = run(pythonPath, ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '-r', requirements], { timeoutMs });
-  return { ok: result.ok, detail: (result.stdout || result.stderr || result.error || '').split('\n').slice(-6).join('\n') };
+  // --no-cache-dir: some Windows setups deny writes to the pip wheel cache
+  // (WinError 5). --prefer-binary avoids surprise source builds.
+  const args = ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--no-cache-dir', '--prefer-binary', '--timeout', '30', '--retries', '2'];
+  if (indexUrl) args.push('-i', indexUrl);
+  args.push('-r', requirements);
+  const result = run(pythonPath, args, { timeoutMs });
+  return { ok: result.ok, detail: (result.stdout || result.stderr || result.error || '').split('\n').slice(-8).join('\n') };
 }
 
 export function checkFfmpeg() {
