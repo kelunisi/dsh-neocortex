@@ -112,9 +112,9 @@ window.__ModuleLoader__.load({
       .nc-setting-control{display:flex;align-items:center;gap:9px}.nc-range{width:100%;accent-color:var(--dsw-alias-brand-primary)}.nc-setting-output{min-width:36px;text-align:right;font-variant-numeric:tabular-nums}
       .nc-input{width:100%;box-sizing:border-box;margin:10px 0;border:1px solid var(--dsw-alias-border-l2);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);padding:7px 10px;font:inherit}
       .nc-preview{white-space:pre-wrap;max-height:300px;overflow:auto;background:var(--dsw-alias-bg-base);border-radius:7px;padding:10px;font-size:12px}
-      .wf-root{position:fixed;right:24px;bottom:130px;z-index:2147483000}
-      .wf-ball{width:46px;height:46px;border-radius:50%;border:1px solid var(--dsw-alias-brand-primary);background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25)}
-      .wf-panel{position:absolute;right:0;bottom:58px;width:min(380px,calc(100vw - 40px));max-height:520px;display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.3);color:var(--dsw-alias-label-primary);font-size:13px}
+      .wf-root{position:fixed;right:24px;bottom:130px;z-index:2147483000;pointer-events:none}
+      .wf-ball{pointer-events:auto;width:46px;height:46px;border-radius:50%;border:1px solid var(--dsw-alias-brand-primary);background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+      .wf-panel{pointer-events:auto;position:absolute;right:0;bottom:58px;width:min(380px,calc(100vw - 40px));max-height:520px;display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.3);color:var(--dsw-alias-label-primary);font-size:13px}
       .wf-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1)}
       .wf-list{overflow:auto;padding:6px 12px}
       .wf-item{padding:9px 0;border-bottom:1px dashed var(--dsw-alias-border-l1)}
@@ -326,11 +326,23 @@ window.__ModuleLoader__.load({
     function createWatchFloat(call, t) {
       return function WatchFloat() {
         const [data, setData] = useState(null);
+        const [error, setError] = useState('');
         const [open, setOpen] = useState(false);
         const [busy, setBusy] = useState(false);
         const refresh = async () => {
-          try { const value = await call('watchOverview'); setData(value); }
-          catch { /* keep the last view */ }
+          try {
+            // 用面板同一个 state 接口，避免新增 remote 方法在旧客户端里不可用。
+            const value = await call('state');
+            setData({
+              queue: value.watchQueue,
+              watch: value.watch,
+              scheduler: value.watchScheduler,
+              budget: value.watchBudget,
+            });
+            setError('');
+          } catch (cause) {
+            setError(cause?.message || String(cause));
+          }
         };
         useEffect(() => {
           let alive = true;
@@ -340,7 +352,7 @@ window.__ModuleLoader__.load({
           return () => { alive = false; clearInterval(timer); };
         }, []);
         const pending = (data?.queue?.items || []).filter((item) => item.status === 'pending');
-        if (!data || !pending.length) return null;
+        if (!error && (!data || !pending.length)) return null;
         const decide = async (decision, ids) => {
           setBusy(true);
           try { await call('watchDecide', { decision, ids }); await refresh(); }
@@ -356,12 +368,14 @@ window.__ModuleLoader__.load({
             h('button', { className: 'nc-btn', disabled: busy, onClick: () => decide('reject', [item.id]) }, t('watchReject')))));
         return h('div', { className: 'wf-root' },
           open ? h('div', { className: 'wf-panel' },
-            h('div', { className: 'wf-head' }, h('b', null, `${t('watchFloatTitle')} · ${pending.length}`), h('button', { className: 'nc-btn', onClick: () => setOpen(false) }, t('watchClose'))),
-            h('div', { className: 'wf-list' }, rows),
+            h('div', { className: 'wf-head' },
+              h('b', null, error ? `${t('watchFloatTitle')} · error` : `${t('watchFloatTitle')} · ${pending.length}`),
+              h('button', { className: 'nc-btn', onClick: () => setOpen(false) }, t('watchClose'))),
+            error ? h('div', { className: 'nc-error' }, error) : h('div', { className: 'wf-list' }, rows),
             h('div', { className: 'wf-foot' },
-              h('button', { className: 'nc-btn', disabled: busy, onClick: () => decide('accept', pending.map((item) => item.id)) }, t('watchAllAccept')),
-              h('button', { className: 'nc-btn', disabled: busy, onClick: () => decide('reject', pending.map((item) => item.id)) }, t('watchAllReject')))) : null,
-          h('button', { className: 'wf-ball', 'aria-label': t('watchFloatTitle'), onClick: () => setOpen(!open) }, String(pending.length)));
+              h('button', { className: 'nc-btn', disabled: busy || !pending.length, onClick: () => decide('accept', pending.map((item) => item.id)) }, t('watchAllAccept')),
+              h('button', { className: 'nc-btn', disabled: busy || !pending.length, onClick: () => decide('reject', pending.map((item) => item.id)) }, t('watchAllReject')))) : null,
+          h('button', { className: 'wf-ball', 'aria-label': t('watchFloatTitle'), onClick: () => setOpen(!open) }, error ? '!' : String(pending.length)));
       };
     }
 
