@@ -2,6 +2,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { loadQueue, saveQueue } from './watch/queue.js';
 import { acceptItems, rejectItems } from './watch/ingest.js';
+import { hydrateItems } from './watch/hydrate.js';
 import { loadSchedulerState } from './watch/scheduler.js';
 import { loadBudget } from './watch/budget.js';
 
@@ -39,12 +40,15 @@ function remoteMethod(Type, name) {
 }
 
 export class NeocortexRemoteService extends TypertRemoteService {
-  constructor(ctx, panel, watch, { dataDir, writer } = {}) {
+  constructor(ctx, panel, watch, { dataDir, writer, config = {}, vendorDir } = {}) {
     super(ctx, 'neocortex', { namespace: 'neocortex' });
     this.panel = panel;
     this.watch = watch;
     this.dataDir = dataDir;
     this.writer = writer;
+    this.ctx = ctx;
+    this.config = config;
+    this.vendorDir = vendorDir;
   }
 
   state() {
@@ -57,15 +61,30 @@ export class NeocortexRemoteService extends TypertRemoteService {
     });
   }
 
-  watchDecide(request) {
+  async watchDecide(request) {
     const queue = loadQueue(this.dataDir);
     const ids = Array.isArray(request?.ids) && request.ids.length ? request.ids : (request?.all ? null : []);
     if (!Array.isArray(ids) && !request?.all) return json({ ok: false, reason: 'ids-required' });
     if (request?.decision === 'accept') {
       if (!this.writer) return json({ ok: false, reason: 'writer-unavailable' });
+      const wanted = ids ? new Set(ids) : null;
+      const selected = queue.items.filter((item) => item.status === 'pending'
+        && (!wanted || wanted.has(item.id) || wanted.has(item.bvid)));
+      const empty = selected.filter((item) => !Array.isArray(item.points) || item.points.length === 0);
+      let hydration;
+      if (empty.length && this.ctx) {
+        // 面板收也走同一条“先补深读再写 L2”的路径；用户不需要多点一步。
+        hydration = await hydrateItems({
+          ctx: this.ctx,
+          dataDir: this.dataDir,
+          config: this.config,
+          vendorDir: this.vendorDir,
+          items: empty,
+        });
+      }
       const result = acceptItems({ writer: this.writer, queue, dataDir: this.dataDir, sessionId: 'watch-panel', ids: ids || undefined });
       saveQueue(this.dataDir, queue);
-      return json({ ok: true, decision: 'accept', ...result, remaining: queue.items.filter((item) => item.status === 'pending').length });
+      return json({ ok: true, decision: 'accept', ...result, hydration, remaining: queue.items.filter((item) => item.status === 'pending').length });
     }
     if (request?.decision === 'reject') {
       const result = rejectItems({ queue, ids: ids || undefined, note: request?.note });

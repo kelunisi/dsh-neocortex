@@ -35,6 +35,7 @@ window.__ModuleLoader__.load({
       watchScan: '每轮扫几条', watchDeep: '每轮深读几条', watchToken: '日 token 预算',
       watchSchedule: '自动调度', watchLast: '上次结果', watchNext: '下次', watchNotScheduled: '未安排',
       watchFloatTitle: '今晚待判', watchClose: '收起', watchSaveWatch: '保存喂养参数', watchSavedWatch: '喂养参数已保存',
+      watchDigesting: '补深读中…',
     };
     const en = {
       tab: 'Neocortex', title: 'Neocortex Memory', subtitle: 'Markdown is authoritative; the ledger explains recall and lifecycle.',
@@ -65,6 +66,7 @@ window.__ModuleLoader__.load({
       watchScan: 'Scan per round', watchDeep: 'Deep reads per round', watchToken: 'Daily token budget',
       watchSchedule: 'Scheduler', watchLast: 'Last result', watchNext: 'Next', watchNotScheduled: 'Not scheduled',
       watchFloatTitle: 'Pending review', watchClose: 'Collapse', watchSaveWatch: 'Save feeding settings', watchSavedWatch: 'Feeding settings saved',
+      watchDigesting: 'Reading subtitles…',
     };
 
     const jsonCodec = {
@@ -234,7 +236,7 @@ window.__ModuleLoader__.load({
               h('div', null, h('b', null, item.title), h('div', { className: 'nc-meta' }, `${item.up || ''} · ${item.duration || ''} · ${item.bvid}`))),
             item.points?.length ? h('ul', null, item.points.map((point, index) => h('li', { key: index }, point))) : h('div', { className: 'nc-note' }, '暂无要点；收之前会尝试补深读'),
             h('div', { className: 'nc-actions' },
-              h(Button, { primary: true, disabled: busy, onClick: safely(async () => { await act('watchDecide', { decision: 'accept', ids: [item.id] }); setMessage(`${t('watchAccept')} ✓`); }) }, t('watchAccept')),
+              h(Button, { primary: true, disabled: busy, onClick: safely(async () => { await act('watchDecide', { decision: 'accept', ids: [item.id] }); setMessage(`${t('watchAccept')} ✓`); }) }, busy ? t('watchDigesting') : t('watchAccept')),
               h(Button, { disabled: busy, onClick: safely(async () => { await act('watchDecide', { decision: 'reject', ids: [item.id] }); setMessage(`${t('watchReject')} ✓`); }) }, t('watchReject')))))
           : h(Empty, null, t('watchQueueEmpty'));
         const watchView = h(React.Fragment, null,
@@ -373,6 +375,7 @@ window.__ModuleLoader__.load({
               h('button', { className: 'nc-btn', onClick: () => setOpen(false) }, t('watchClose'))),
             error ? h('div', { className: 'nc-error' }, error) : h('div', { className: 'wf-list' }, rows),
             h('div', { className: 'wf-foot' },
+              busy ? h('span', { className: 'wf-meta', style: { marginRight: 'auto' } }, t('watchDigesting')) : null,
               h('button', { className: 'nc-btn', disabled: busy || !pending.length, onClick: () => decide('accept', pending.map((item) => item.id)) }, t('watchAllAccept')),
               h('button', { className: 'nc-btn', disabled: busy || !pending.length, onClick: () => decide('reject', pending.map((item) => item.id)) }, t('watchAllReject')))) : null,
           h('button', {
