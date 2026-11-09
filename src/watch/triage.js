@@ -21,6 +21,7 @@ export function normalizeVideo(item) {
     pubdate: Number(item.pubdate ?? 0),
     description: String(item.description || '').trim(),
     origin: item.origin === 'explore' ? 'explore' : undefined,
+    originQuery: item.originQuery ? String(item.originQuery).slice(0, 80) : undefined,
   };
 }
 
@@ -49,7 +50,7 @@ function playDesc(a, b) {
  * @param {object} criteria parsed criteria
  * @param {{scanPerRound?:number, explorationRatio?:number}} options
  */
-export function pickCandidates(videos, criteria, { scanPerRound = 5, explorationRatio = 0.2 } = {}) {
+export function pickCandidates(videos, criteria, { scanPerRound = 5, explorationRatio = 0.2, maxPerQuery = 2 } = {}) {
   const scored = dedupeVideos(videos).map((video) => {
     const triage = scoreCandidate(video, criteria);
     return { video, triage };
@@ -61,13 +62,27 @@ export function pickCandidates(videos, criteria, { scanPerRound = 5, exploration
     && item.triage.utilityHits.length > 0)
     .sort((a, b) => b.triage.utilityHits.length - a.triage.utilityHits.length || b.triage.directionHits.length - a.triage.directionHits.length || playDesc(a.video, b.video) || pubdateDesc(a.video, b.video));
 
+  // 每个搜索词最多贡献 maxPerQuery 条，避免一个词（如"信息报送"）霸占全部名额。
+  const take = (pool, slots) => {
+    const out = [];
+    const counts = new Map();
+    for (const item of pool) {
+      if (out.length >= slots) break;
+      const key = item.video.originQuery || item.video.bvid;
+      if ((counts.get(key) || 0) >= maxPerQuery) continue;
+      counts.set(key, (counts.get(key) || 0) + 1);
+      out.push(item);
+    }
+    return out;
+  };
+
   const explorationSlots = Math.min(scanPerRound, Math.max(1, Math.round(scanPerRound * explorationRatio)));
   const keywordSlots = Math.max(0, scanPerRound - explorationSlots);
   const picked = [
-    ...keyword.slice(0, keywordSlots).map((item) => ({ ...item, bucket: 'keyword' })),
-    ...exploration.slice(0, explorationSlots).map((item) => ({ ...item, bucket: 'exploration' })),
+    ...take(keyword, keywordSlots).map((item) => ({ ...item, bucket: 'keyword' })),
+    ...take(exploration, explorationSlots).map((item) => ({ ...item, bucket: 'exploration' })),
   ];
-  // 一边不够就从另一边补，保证尽量凑满 scanPerRound。
+  // 一边不够就从另一边补，保证尽量凑满 scanPerRound（补位不再受 maxPerQuery 限制）。
   for (const pool of [keyword, exploration]) {
     for (const item of pool) {
       if (picked.length >= scanPerRound) break;

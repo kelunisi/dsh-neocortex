@@ -50,11 +50,13 @@ export async function runDryRound({
   const model = llm || ctx?.get?.('llm');
   if (!model?.stream) throw new Error('当前 profile 没有可用的 LLM 服务（ctx.llm）');
 
-  const queries = Array.isArray(config.queries) && config.queries.length
-    ? config.queries.filter(Boolean).slice(0, 4)
-    : (criteria.must.length ? criteria.must.slice(0, 3) : ['知识']);
+  const configured = Array.isArray(config.queries) && config.queries.length
+    ? config.queries.filter(Boolean)
+    : (criteria.queries.length ? criteria.queries : (criteria.must.length ? criteria.must.slice(0, 3) : ['知识']));
+  const queries = configured.slice(0, 10);
   const exploreQueries = buildExploreQueries(criteria, 2);
   const examples = loadCalibration(dataDir, { limit: 8 }).entries;
+  const judged = new Set(loadCalibration(dataDir, { limit: 500 }).entries.map((item) => item.bvid));
 
   const { client } = clientFactory({ dataDir, config, vendorDir, log });
   try {
@@ -62,7 +64,7 @@ export async function runDryRound({
     for (const keyword of queries) {
       if (signal?.aborted) throw new Error('已取消');
       const result = await client.call('bili_search', { keyword, num: 10, order: 'totalrank', page: 1 }, { timeoutMs: 45000, signal });
-      const videos = videosOf(result);
+      const videos = videosOf(result).map((video) => ({ ...video, originQuery: keyword }));
       collected.push(...videos);
       log(`搜索「${keyword}」：${videos.length} 条`);
     }
@@ -70,7 +72,7 @@ export async function runDryRound({
       if (signal?.aborted) throw new Error('已取消');
       try {
         const result = await client.call('bili_search', { keyword, num: 8, order: 'totalrank', page: 1 }, { timeoutMs: 45000, signal });
-        const videos = videosOf(result).map((video) => ({ ...video, origin: 'explore' }));
+        const videos = videosOf(result).map((video) => ({ ...video, origin: 'explore', originQuery: keyword }));
         collected.push(...videos);
         log(`探索「${keyword}」：${videos.length} 条`);
       } catch (error) {
@@ -78,7 +80,8 @@ export async function runDryRound({
       }
     }
 
-    const all = dedupeVideos(collected);
+    const all = dedupeVideos(collected).filter((video) => !judged.has(video.bvid));
+    if (judged.size) log(`跳过已判定过的 ${judged.size} 条 BV`);
     const picked = pickCandidates(all, criteria, {
       scanPerRound: config.scanPerRound || 5,
       explorationRatio: config.explorationRatio ?? 0.2,

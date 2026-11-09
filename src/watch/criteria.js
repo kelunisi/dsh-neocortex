@@ -52,7 +52,7 @@ function splitKeywords(text) {
 
 export function parseCriteria(markdown) {
   const lines = String(markdown || '').replace(/\r/g, '').split('\n');
-  const result = { persona: '', directions: [], must: [], plus: [], exclude: [], exploration: [], raw: markdown };
+  const result = { persona: '', directions: [], queries: [], must: [], plus: [], exclude: [], exploration: [], raw: markdown };
   let section = '';
   let keywordGroup = '';
   for (const raw of lines) {
@@ -72,6 +72,8 @@ export function parseCriteria(markdown) {
       result.persona = result.persona ? `${result.persona} ${line}` : line;
     } else if (/^关注方向/.test(section) && /^(\d+[.、]|[-*])\s*/.test(line)) {
       result.directions.push(line.replace(/^(\d+[.、]|[-*])\s*/, '').trim());
+    } else if (/^搜索词/.test(section)) {
+      result.queries.push(...splitKeywords(line.replace(/^(\d+[.、]|[-*])\s*/, '')));
     } else if (/^关键词/.test(section)) {
       if (/必含/.test(keywordGroup)) result.must.push(...splitKeywords(line));
       else if (/加分/.test(keywordGroup)) result.plus.push(...splitKeywords(line));

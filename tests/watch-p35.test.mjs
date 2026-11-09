@@ -51,6 +51,11 @@ test('P35-01 direction tokens exclude must words for exploration queries', () =>
   assert.ok(queries.some((query) => query.includes('公文写作') || query.includes('基层减负')));
 });
 
+test('P35-01b search queries section parses comma-separated queries', () => {
+  const criteria = parseCriteria(`${CRITERIA}\n## 搜索词\n信息报送, 金价走势, 显卡价格, DSH 插件\n`);
+  assert.deepEqual(criteria.queries, ['信息报送', '金价走势', '显卡价格', 'DSH 插件']);
+});
+
 test('P35-02 exploration pool only takes direction-related or explicit explore candidates', () => {
   const criteria = parseCriteria(CRITERIA);
   const videos = [
