@@ -85,6 +85,44 @@ export function acceptItems({ writer, queue, dataDir, sessionId, ids }) {
   return { accepted, duplicates, errors };
 }
 
+export function retryItems({ writer, queue, sessionId, ids }) {
+  const wanted = ids && ids.length ? new Set(ids) : null;
+  const retried = [];
+  const errors = [];
+  for (const item of queue.items) {
+    if (item.status !== 'error') continue;
+    if (wanted && !wanted.has(item.id) && !wanted.has(item.bvid)) continue;
+    const targetPath = targetPathFor(item);
+    try {
+      let l2 = item.l2;
+      if (!alreadyIngested(writer, item, targetPath)) {
+        l2 = writer.remember({
+          text: l2Text(item),
+          layer: 'L2',
+          targetPath,
+          source: item.url,
+        }, { sessionId });
+      }
+      const l3 = writer.remember({
+        text: l3Text(item),
+        layer: 'L3',
+        scene: '通用',
+      }, { sessionId });
+      item.status = 'accepted';
+      item.note = null;
+      item.decidedAt = new Date().toISOString();
+      item.l2 = l2;
+      item.l3 = l3;
+      item.targetPath = targetPath;
+      retried.push({ bvid: item.bvid, title: item.title, l2, l3, targetPath });
+    } catch (error) {
+      item.note = String(error?.message || error).slice(0, 300);
+      errors.push({ bvid: item.bvid, error: item.note });
+    }
+  }
+  return { retried, errors };
+}
+
 export function rejectItems({ queue, ids, note }) {
   const wanted = ids && ids.length ? new Set(ids) : null;
   const rejected = [];

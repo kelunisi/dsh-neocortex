@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import { sanitize } from '../defaults.js';
 import { appendDecisions } from './calibration.js';
 import { hydrateItems } from './hydrate.js';
-import { acceptItems, rejectItems } from './ingest.js';
+import { acceptItems, rejectItems, retryItems } from './ingest.js';
 import { loginPoll, loginStart, qrDataUrl, renderQrPng, saveCredential } from './login.js';
 import { credentialFile, readCredential, resolvePython, venvPython } from './python.js';
 import { loadQueue, saveQueue } from './queue.js';
@@ -187,7 +187,7 @@ function createIngestTool(context) {
     parameters: {
       type: 'object',
       properties: {
-        decision: { type: 'string', enum: ['accept', 'reject'] },
+        decision: { type: 'string', enum: ['accept', 'reject', 'retry'], description: 'accept 收、reject 扔、retry 重试之前写失败的条目。' },
         ids: { type: 'array', items: { type: 'string' }, description: '队列条目 id 或 bvid；省略时配合 all=true。' },
         all: { type: 'boolean', description: 'true 表示处理全部待判条目。' },
         note: { type: 'string', description: '可选备注，写进队列。' },
@@ -228,6 +228,13 @@ function createIngestTool(context) {
           saveQueue(context.dataDir, queue);
           const remaining = queue.items.filter((item) => item.status === 'pending').length;
           return sanitize({ ok: true, decision: 'accept', ...result, hydration, remaining, queueFile: queue.file });
+        }
+        if (args.decision === 'retry') {
+          if (!context.writer) return sanitize({ ok: false, reason: 'writer-unavailable' });
+          const result = retryItems({ writer: context.writer, queue, dataDir: context.dataDir, sessionId: 'watch-ingest-retry', ids: ids || undefined });
+          saveQueue(context.dataDir, queue);
+          const remaining = queue.items.filter((item) => item.status === 'pending').length;
+          return sanitize({ ok: true, decision: 'retry', ...result, remaining, queueFile: queue.file });
         }
         const result = rejectItems({ queue, ids: ids || undefined, note: args?.note });
         saveQueue(context.dataDir, queue);
