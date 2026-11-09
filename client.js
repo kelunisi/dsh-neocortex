@@ -313,7 +313,6 @@ window.__ModuleLoader__.load({
           h(Button, { primary: true, disabled: busy, onClick: safely(async () => { await act('updateSettings', draft); setMessage(t('saved')); }) }, t('save')));
 
         return h('div', { className: 'nc-panel', 'data-neocortex-panel': 'true' },
-          h('style', null, css),
           h('header', { className: 'nc-header' }, h('div', null, h('h2', { className: 'nc-title' }, t('title')), h('p', { className: 'nc-subtitle' }, t('subtitle'))), h(Button, { disabled: busy, onClick: safely(load) }, t('refresh'))),
           h('div', { className: 'nc-note' }, t('noDemo')),
           h('nav', { className: 'nc-nav', 'aria-label': t('tab') }, [['overview', t('overview')], ['watch', t('watchTab')], ['review', t('review')], ['settings', t('settings')]].map(([id, label]) => h('button', { key: id, type: 'button', 'data-active': view === id, onClick: () => setView(id) }, label))),
@@ -352,7 +351,8 @@ window.__ModuleLoader__.load({
           return () => { alive = false; clearInterval(timer); };
         }, []);
         const pending = (data?.queue?.items || []).filter((item) => item.status === 'pending');
-        if (!error && (!data || !pending.length)) return null;
+        // 队列为空时不出现；还没取到数据时显示 …，取数失败显示 !，绝不静默消失。
+        if (data && !error && !pending.length) return null;
         const decide = async (decision, ids) => {
           setBusy(true);
           try { await call('watchDecide', { decision, ids }); await refresh(); }
@@ -375,7 +375,18 @@ window.__ModuleLoader__.load({
             h('div', { className: 'wf-foot' },
               h('button', { className: 'nc-btn', disabled: busy || !pending.length, onClick: () => decide('accept', pending.map((item) => item.id)) }, t('watchAllAccept')),
               h('button', { className: 'nc-btn', disabled: busy || !pending.length, onClick: () => decide('reject', pending.map((item) => item.id)) }, t('watchAllReject')))) : null,
-          h('button', { className: 'wf-ball', 'aria-label': t('watchFloatTitle'), onClick: () => setOpen(!open) }, error ? '!' : String(pending.length)));
+          h('button', {
+            className: 'wf-ball',
+            title: t('watchFloatTitle'),
+            'aria-label': t('watchFloatTitle'),
+            style: {
+              width: '54px', height: '54px', borderRadius: '27px',
+              background: '#e5484d', color: '#ffffff', border: '2px solid #ffffff',
+              fontSize: '14px', fontWeight: 700, cursor: 'pointer',
+              boxShadow: '0 6px 18px rgba(0,0,0,.35)',
+            },
+            onClick: () => setOpen(!open),
+          }, error ? '!' : data ? String(pending.length) : '…'));
       };
     }
 
@@ -395,6 +406,14 @@ window.__ModuleLoader__.load({
           return result.value;
         };
         const Panel = createPanel(call, t);
+        ctx.effect(() => {
+          if (typeof document === 'undefined') return () => {};
+          const style = document.createElement('style');
+          style.setAttribute('data-dsh-neocortex', 'styles');
+          style.textContent = css;
+          document.head.appendChild(style);
+          return () => style.remove();
+        }, 'neocortex: styles');
         ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
           name: 'settings.plugins.tab', id: 'neocortex', order: 30,
           label: () => t('tab'), locale: 'neocortex',

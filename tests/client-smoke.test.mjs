@@ -23,6 +23,12 @@ test('CLIENT-01 plugin entry registers the settings tab and the shell overlay', 
   assert.deepEqual(mod.inject, ['slots', 'locale', 'remote']);
 
   const injected = [];
+  const styles = [];
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    createElement: () => ({ setAttribute() {}, textContent: '' }),
+    head: { appendChild: (node) => { styles.push(node); } },
+  };
   const ctx = {
     effect: (factory) => { try { return factory(); } catch { return undefined; } },
     locale: { register: () => ({}), bind: () => (key) => key },
@@ -34,5 +40,8 @@ test('CLIENT-01 plugin entry registers the settings tab and the shell overlay', 
     },
   };
   mod.apply(ctx);
+  globalThis.document = previousDocument;
   assert.deepEqual(injected, ['settings.plugins.tab', 'shell.overlay']);
+  assert.equal(styles.length, 1, 'global styles must be injected once, independent of the settings tab');
+  assert.match(styles[0].textContent, /\.wf-ball/);
 });
