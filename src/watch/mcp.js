@@ -10,7 +10,6 @@
 
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
 const PKG = (() => {
   try { return JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')); } catch { return {}; }
@@ -150,8 +149,4 @@ export class McpClient {
       }
     });
   }
-}
-
-export function modulePath() {
-  return fileURLToPath(import.meta.url);
 }

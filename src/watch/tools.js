@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { sanitize } from '../defaults.js';
 import { loginPoll, loginStart, qrDataUrl, renderQrPng, saveCredential } from './login.js';
 import { credentialFile, readCredential, resolvePython, venvPython } from './python.js';
+import { runDryRound } from './round.js';
 import { runSelftest } from './selftest.js';
 import { defaultVendorDir } from './bili.js';
 
@@ -99,10 +100,51 @@ function createLoginTool(context) {
   };
 }
 
-export function registerWatchTools(ctx, { dataDir, config = {}, vendorDir = defaultVendorDir() }) {
+function createRunTool(context) {
+  return {
+    name: 'watch_run',
+    description: '手动跑一轮喂养（P3 离线试跑）：抓取 B 站候选、代码粗筛、深读 2–3 条、写日报与 JSONL；不写智脑、不发评论。需要先把开关切到 code 或 agent。',
+    timeoutMs: 900000,
+    parameters: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['dry'], description: 'P3 只支持 dry（离线试跑）。' },
+        queries: { type: 'array', items: { type: 'string' }, description: '可选：覆盖判据里的搜索词。' },
+        deep: { type: 'integer', minimum: 1, maximum: 5, description: '可选：深读条数，默认 3。' },
+      },
+      additionalProperties: false,
+    },
+    output: {
+      schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+    },
+    execute: async (args, exec) => {
+      try {
+        if (!context.watch?.enabled?.()) return sanitize({ ok: false, reason: 'mode-off', message: '喂养开关是 off；先在面板切到 code 模式。' });
+        const result = await runDryRound({
+          ctx: context.ctx,
+          dataDir: context.dataDir,
+          config: {
+            ...context.config,
+            queries: args?.queries,
+            deepPerRound: args?.deep ?? context.config?.deepPerRound,
+          },
+          vendorDir: context.vendorDir,
+          signal: exec?.signal,
+          log: (line) => console.error('[watch]', line),
+        });
+        return sanitize(result);
+      } catch (error) {
+        return sanitize({ ok: false, reason: 'run-failed', message: String(error?.message || error) });
+      }
+    },
+  };
+}
+
+export function registerWatchTools(ctx, { dataDir, config = {}, vendorDir = defaultVendorDir(), watch } = {}) {
   if (!ctx?.tools?.register) return [];
-  const context = { dataDir, config, vendorDir };
-  const tools = [createSelftestTool(context), createLoginTool(context)];
+  const context = { ctx, dataDir, config, vendorDir, watch };
+  const tools = [createSelftestTool(context), createLoginTool(context), createRunTool(context)];
   for (const tool of tools) {
     try { ctx.tools.register(tool); } catch (error) { console.error('[dsh-neocortex] watch tool registration failed', error); }
   }

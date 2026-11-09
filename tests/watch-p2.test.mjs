@@ -102,10 +102,10 @@ test('P2-07 resolveBiliRuntime wires the runtime dir and credential path', () =>
   assert.equal(venvPython(dataDir).includes('.venv'), true);
 });
 
-test('P2-08 watch tools register exactly selftest and login', () => {
+test('P2-08 watch tools register exactly selftest, login and run', () => {
   const registered = [];
   const ctx = { tools: { register: (tool) => registered.push(tool.name) } };
   const names = registerWatchTools(ctx, { dataDir: tempDir(), config: {}, vendorDir });
-  assert.deepEqual(names, ['watch_selftest', 'watch_login']);
-  assert.deepEqual(registered, ['watch_selftest', 'watch_login']);
+  assert.deepEqual(names, ['watch_selftest', 'watch_login', 'watch_run']);
+  assert.deepEqual(registered, ['watch_selftest', 'watch_login', 'watch_run']);
 });
