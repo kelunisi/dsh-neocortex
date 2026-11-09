@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- 喂养（watch）模块的 P1 骨架：`src/watch/`、三档开关（`off` / `code` / `agent`，默认 `off`）、`<dataDir>/watch.json` 原子持久化，以及 Web 面板的「喂养」页签。开关能存能读；`off` 时不启动定时器、不抓取、不发送、不创建文件。
+- P0 技术结论 [`docs/p0-agent-mode.md`](docs/p0-agent-mode.md)：`agent` 模式可行，但需要随包交付一个 agent preset 行，并依赖 Host 的 `agentPresets.mount()`；`code` 模式不依赖这些，仍是默认推荐。
+
+### Changed
+
+- 版本进入 `0.5.0-dev.0` 开发线；P9 发布时改为 `0.5.0`。
+
+### Notes
+
+- 这是开发版，不是发布版。P2 起的抓取、判据、待确认队列、互动与隐私闸尚未实现。
+
 ## [0.4.0] - 2026-11-05
 
 ### Added

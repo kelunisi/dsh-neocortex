@@ -3,3 +3,6 @@
       name: 'dsh-neocortex'
       config:
         probeOnStart: false
+        # 喂养模块（v0.5）默认关闭；运行期开关存 <dataDir>/watch.json。
+        watch:
+          mode: 'off'

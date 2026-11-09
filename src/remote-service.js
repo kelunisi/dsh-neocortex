@@ -35,13 +35,18 @@ function remoteMethod(Type, name) {
 }
 
 export class NeocortexRemoteService extends TypertRemoteService {
-  constructor(ctx, panel) {
+  constructor(ctx, panel, watch) {
     super(ctx, 'neocortex', { namespace: 'neocortex' });
     this.panel = panel;
+    this.watch = watch;
   }
 
   state() {
-    return json(this.panel.state());
+    return json({ ...this.panel.state(), watch: this.watch.state() });
+  }
+
+  updateWatch(request) {
+    return json(this.watch.setMode(request?.mode));
   }
 
   previewReview(request) {
@@ -81,6 +86,6 @@ export class NeocortexRemoteService extends TypertRemoteService {
   }
 }
 
-for (const name of ['state', 'previewReview', 'confirmL1', 'undo', 'acceptReview', 'rejectReview', 'manualReview', 'retryReview', 'updateSettings', 'initializeBrain']) {
+for (const name of ['state', 'previewReview', 'confirmL1', 'undo', 'acceptReview', 'rejectReview', 'manualReview', 'retryReview', 'updateSettings', 'initializeBrain', 'updateWatch']) {
   remoteMethod(NeocortexRemoteService, name);
 }

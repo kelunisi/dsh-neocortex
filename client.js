@@ -22,6 +22,14 @@ window.__ModuleLoader__.load({
       setupCurrent: '当前脑库', setupMissing: '目录不存在', setupEmpty: '空目录', setupUnrecognized: '非空但缺少智脑特征', setupNotDir: '路径不是目录',
       setupNew: '新建智脑', setupTakeover: '使用已有智脑', setupUpgrade: '升级补齐骨架', setupDirPlaceholder: '目录路径，留空用默认',
       setupStart: '执行', setupDoneNew: '新建完成', setupDoneTakeover: '接管完成', setupDoneUpgrade: '补齐完成', setupRestart: '重启插件后生效',
+      watchTab: '喂养', watchTitle: '喂养模块', watchPhase: 'P1 骨架 · 只有开关，没有抓取、没有发送',
+      watchCurrent: '当前模式', watchOff: '关闭', watchCode: '代码模式', watchAgent: 'Agent 模式',
+      watchOffDesc: '一键停：不起进程、不花 token、历史数据不动。',
+      watchCodeDesc: '代码跑腿，模型只判断（推荐）。抓取从 P2 接入。',
+      watchAgentDesc: '受限会话自主跑。P0 结论：可行，但要单独装 preset；P1 只留位置。',
+      watchSaved: '喂养开关已保存。', watchQueue: '待确认卡片',
+      watchEmptyQueue: '还没有待确认卡片——P1 阶段不抓取内容。',
+      watchData: '状态文件', watchEnabled: '已开启', watchDisabled: '已关闭',
     };
     const en = {
       tab: 'Neocortex', title: 'Neocortex Memory', subtitle: 'Markdown is authoritative; the ledger explains recall and lifecycle.',
@@ -39,6 +47,14 @@ window.__ModuleLoader__.load({
       setupCurrent: 'Current brain', setupMissing: 'Directory missing', setupEmpty: 'Empty directory', setupUnrecognized: 'Non-empty but no brain markers', setupNotDir: 'Path is not a directory',
       setupNew: 'Create new brain', setupTakeover: 'Use existing brain', setupUpgrade: 'Upgrade skeleton', setupDirPlaceholder: 'Directory path; blank uses default',
       setupStart: 'Run', setupDoneNew: 'Created', setupDoneTakeover: 'Taken over', setupDoneUpgrade: 'Upgraded', setupRestart: 'Restart the plugin to take effect',
+      watchTab: 'Feeding', watchTitle: 'Feeding module', watchPhase: 'P1 skeleton — the switch only; no harvesting, no sending.',
+      watchCurrent: 'Current mode', watchOff: 'Off', watchCode: 'Code', watchAgent: 'Agent',
+      watchOffDesc: 'Stop everything: no process, no tokens, history untouched.',
+      watchCodeDesc: 'Code does the legwork, the model only judges (recommended). Harvest lands in P2.',
+      watchAgentDesc: 'A restricted session runs on its own. P0: feasible, but needs a shipped preset; P1 only reserves the slot.',
+      watchSaved: 'Feeding switch saved.', watchQueue: 'Pending cards',
+      watchEmptyQueue: 'No pending cards yet — P1 does not harvest anything.',
+      watchData: 'State file', watchEnabled: 'Enabled', watchDisabled: 'Disabled',
     };
 
     const jsonCodec = {
@@ -51,7 +67,7 @@ window.__ModuleLoader__.load({
     const methods = {
       state: false, previewReview: true, confirmL1: true, undo: true,
       acceptReview: true, rejectReview: true, manualReview: false, retryReview: false,
-      updateSettings: true, initializeBrain: true,
+      updateSettings: true, initializeBrain: true, updateWatch: true,
     };
     const TYPERT_REMOTE = {
       package: 'dsh-neocortex',
@@ -157,6 +173,24 @@ window.__ModuleLoader__.load({
                 }
               }) }, t('setupStart'))))) : null;
 
+        const watch = state.watch || { mode: 'off', enabled: false, file: '', modes: ['off', 'code', 'agent'] };
+        const modeButton = (mode, label) => h(Button, {
+          primary: watch.mode === mode, disabled: busy,
+          onClick: safely(async () => { await act('updateWatch', { mode }); setMessage(t('watchSaved')); }),
+        }, label);
+        const modeDescription = watch.mode === 'off' ? t('watchOffDesc') : watch.mode === 'code' ? t('watchCodeDesc') : t('watchAgentDesc');
+        const watchView = h(React.Fragment, null,
+          h(Section, { title: t('watchTitle'), note: t('watchPhase') },
+            h('div', { className: 'nc-card' },
+              h('div', { className: 'nc-card-head' },
+                h('div', null, h('b', null, `${t('watchCurrent')}: ${watch.mode}`)),
+                h('span', null, watch.enabled ? t('watchEnabled') : t('watchDisabled'))),
+              h('div', { className: 'nc-actions' }, modeButton('off', t('watchOff')), modeButton('code', t('watchCode')), modeButton('agent', t('watchAgent'))),
+              h('p', { className: 'nc-note' }, modeDescription),
+              h('div', { className: 'nc-meta nc-path' }, `${t('watchData')}: ${watch.file || '—'}`))),
+          h(Section, { title: t('watchQueue') }, h(Empty, null, t('watchEmptyQueue'))),
+        );
+
         const overview = h(React.Fragment, null,
           setupCard,
           h('div', { className: 'nc-stats' }, cards.map(([label, value]) => h('div', { className: 'nc-stat', key: label }, h('strong', null, value), h('span', null, label)))),
@@ -219,10 +253,10 @@ window.__ModuleLoader__.load({
           h('style', null, css),
           h('header', { className: 'nc-header' }, h('div', null, h('h2', { className: 'nc-title' }, t('title')), h('p', { className: 'nc-subtitle' }, t('subtitle'))), h(Button, { disabled: busy, onClick: safely(load) }, t('refresh'))),
           h('div', { className: 'nc-note' }, t('noDemo')),
-          h('nav', { className: 'nc-nav', 'aria-label': t('tab') }, [['overview', t('overview')], ['review', t('review')], ['settings', t('settings')]].map(([id, label]) => h('button', { key: id, type: 'button', 'data-active': view === id, onClick: () => setView(id) }, label))),
+          h('nav', { className: 'nc-nav', 'aria-label': t('tab') }, [['overview', t('overview')], ['watch', t('watchTab')], ['review', t('review')], ['settings', t('settings')]].map(([id, label]) => h('button', { key: id, type: 'button', 'data-active': view === id, onClick: () => setView(id) }, label))),
           error ? h('div', { className: 'nc-error', role: 'alert' }, error) : null,
           message ? h('div', { className: 'nc-success', role: 'status' }, message) : null,
-          view === 'overview' ? overview : view === 'review' ? reviews : settings);
+          view === 'overview' ? overview : view === 'watch' ? watchView : view === 'review' ? reviews : settings);
       };
     }
 

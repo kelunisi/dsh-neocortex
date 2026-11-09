@@ -14,6 +14,7 @@ import { WeeklyReview } from './src/review.js';
 import { loadSettings, PanelStateService } from './src/panel-service.js';
 import { NeocortexRemoteService } from './src/remote-service.js';
 import { executePanelTool, isPanelReadAction } from './src/panel-tool.js';
+import { mountWatch } from './src/watch/index.js';
 
 export const inject = ['agents', 'sessions', 'tools', 'systemPrompt'];
 
@@ -58,7 +59,9 @@ export function apply(ctx, rawConfig = {}) {
   const lifecycle = new LifecycleEngine({ brainRoot, ledger, writer, config });
   const review = new WeeklyReview({ brainRoot, ledger, writer, lifecycle, config });
   const panel = new PanelStateService({ brainRoot, dataDir, ledger, writer, lifecycle, review, config, templateRoot: path.join(packageRoot, 'templates', 'brain') });
-  new NeocortexRemoteService(ctx, panel);
+  // 喂养（watch）模块：P1 只有三档开关与持久化，默认 off 时零行为。
+  const watch = mountWatch({ ctx, dataDir, initialMode: rawConfig.watch?.mode });
+  new NeocortexRemoteService(ctx, panel, watch);
   const runtime = new NeocortexRuntime({
     ledger,
     brainRoot,
