@@ -17,13 +17,13 @@ import { registerWatchTools } from './tools.js';
  * @param {string} [options.vendorDir]
  * @returns {WatchService}
  */
-export function mountWatch({ ctx, dataDir, initialMode, config = {}, vendorDir }) {
+export function mountWatch({ ctx, dataDir, initialMode, config = {}, vendorDir, writer }) {
   const watch = new WatchService({ dataDir, initialMode });
   if (ctx && typeof ctx.effect === 'function') {
     ctx.effect(() => () => watch.dispose(), 'dsh-neocortex: watch module');
   }
-  // 体检、扫码登录、离线跑一轮：被动注册，不调用就不产生任何网络/文件行为。
-  registerWatchTools(ctx, { dataDir, config, vendorDir, watch });
+  // 体检、扫码登录、离线跑一轮、收/扔入库：被动注册，不调用就不产生任何网络/文件行为。
+  registerWatchTools(ctx, { dataDir, config, vendorDir, watch, writer });
   // P1 keeps the module inert even when the mode is on: the switch is stored and
   // readable, but no timer or pipeline exists yet. P2 (harvest) and P6
   // (scheduler) start from `watch.enabled()` here.

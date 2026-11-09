@@ -66,6 +66,7 @@ export function apply(ctx, rawConfig = {}) {
     initialMode: rawConfig.watch?.mode,
     config: rawConfig.watch || {},
     vendorDir: path.join(packageRoot, 'vendor', 'bilibili-mcp'),
+    writer,
   });
   new NeocortexRemoteService(ctx, panel, watch);
   const runtime = new NeocortexRuntime({

@@ -6,8 +6,10 @@
 import fs from 'node:fs';
 import { sanitize } from '../defaults.js';
 import { appendDecisions } from './calibration.js';
+import { acceptItems, rejectItems } from './ingest.js';
 import { loginPoll, loginStart, qrDataUrl, renderQrPng, saveCredential } from './login.js';
 import { credentialFile, readCredential, resolvePython, venvPython } from './python.js';
+import { loadQueue, saveQueue } from './queue.js';
 import { runDryRound } from './round.js';
 import { runSelftest } from './selftest.js';
 import { defaultVendorDir } from './bili.js';
@@ -176,10 +178,53 @@ function createFeedbackTool(context) {
   };
 }
 
-export function registerWatchTools(ctx, { dataDir, config = {}, vendorDir = defaultVendorDir(), watch } = {}) {
+function createIngestTool(context) {
+  return {
+    name: 'watch_ingest',
+    description: '处理待确认队列：accept 把条目写进智脑（L2 来源摘要 + L3 近况），reject 只留跳过原因。ids 省略或 all=true 时处理全部待判条目。',
+    parameters: {
+      type: 'object',
+      properties: {
+        decision: { type: 'string', enum: ['accept', 'reject'] },
+        ids: { type: 'array', items: { type: 'string' }, description: '队列条目 id 或 bvid；省略时配合 all=true。' },
+        all: { type: 'boolean', description: 'true 表示处理全部待判条目。' },
+        note: { type: 'string', description: '可选备注，写进队列。' },
+      },
+      required: ['decision'],
+      additionalProperties: false,
+    },
+    output: {
+      schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+    },
+    execute: async (args) => {
+      try {
+        const queue = loadQueue(context.dataDir);
+        if (!queue.items.length) return sanitize({ ok: false, reason: 'queue-empty', message: '待确认队列是空的。' });
+        const ids = Array.isArray(args?.ids) && args.ids.length ? args.ids : (!args?.all ? undefined : null);
+        if (!ids && args?.all !== true) return sanitize({ ok: false, reason: 'ids-required', message: '给 ids，或 all=true。' });
+        if (args.decision === 'accept') {
+          if (!context.writer) return sanitize({ ok: false, reason: 'writer-unavailable' });
+          const result = acceptItems({ writer: context.writer, queue, dataDir: context.dataDir, sessionId: 'watch-ingest', ids: ids || undefined });
+          saveQueue(context.dataDir, queue);
+          const remaining = queue.items.filter((item) => item.status === 'pending').length;
+          return sanitize({ ok: true, decision: 'accept', ...result, remaining, queueFile: queue.file });
+        }
+        const result = rejectItems({ queue, ids: ids || undefined, note: args?.note });
+        saveQueue(context.dataDir, queue);
+        const remaining = queue.items.filter((item) => item.status === 'pending').length;
+        return sanitize({ ok: true, decision: 'reject', ...result, remaining, queueFile: queue.file });
+      } catch (error) {
+        return sanitize({ ok: false, reason: 'ingest-failed', message: String(error?.message || error) });
+      }
+    },
+  };
+}
+
+export function registerWatchTools(ctx, { dataDir, config = {}, vendorDir = defaultVendorDir(), watch, writer } = {}) {
   if (!ctx?.tools?.register) return [];
-  const context = { ctx, dataDir, config, vendorDir, watch };
-  const tools = [createSelftestTool(context), createLoginTool(context), createRunTool(context), createFeedbackTool(context)];
+  const context = { ctx, dataDir, config, vendorDir, watch, writer };
+  const tools = [createSelftestTool(context), createLoginTool(context), createRunTool(context), createFeedbackTool(context), createIngestTool(context)];
   for (const tool of tools) {
     try { ctx.tools.register(tool); } catch (error) { console.error('[dsh-neocortex] watch tool registration failed', error); }
   }

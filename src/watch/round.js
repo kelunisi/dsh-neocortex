@@ -5,6 +5,7 @@
 
 import { loadCriteria, directionTokens } from './criteria.js';
 import { loadCalibration } from './calibration.js';
+import { buildQueue } from './queue.js';
 import { createBiliClient } from './bili.js';
 import { dedupeVideos, pickCandidates, selectDeep } from './triage.js';
 import { normalizeSubtitle, resolveModelRoute, understandVideo } from './understand.js';
@@ -111,9 +112,11 @@ export async function runDryRound({
       criteriaFile: file,
       now,
     });
+    const queue = buildQueue({ dataDir, date: localDay(now), picked, deepById });
     return {
       ok: true,
       ...report,
+      queue: { file: queue.file, count: queue.items.length },
       route: modelRoute,
       queries,
       exploreQueries,
