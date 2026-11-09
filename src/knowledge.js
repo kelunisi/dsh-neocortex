@@ -14,6 +14,7 @@ const STOPWORDS = new Set([
   '我的', '我们', '之前', '以前', '曾经', '记得', '什么', '怎么', '是否', '现在', '这个', '那个', '可以', '如何', '一下', '就是', '还是', '以及', '因为', '所以',
   // 通用词：在多数页面里都会出现，拿来做检索只会产生噪声
   '默认', '内容', '需要', '没有', '情况', '判定', '深读', '浅度', '悬浮', '面板', '提示', '忘记', '也就是说', '还有', '如果', '但是', '一个', '进行', '使用', '问题', '时候', '知道', '看看',
+  '流程', '继续', '咱们', '按照', '建议', '讨论', '指挥', '开干', '不要', '不用', '开始', '一下', '这样', '那么', '目前', '现在',
 ]);
 
 function walkMarkdown(root, dir, out = []) {
@@ -119,11 +120,13 @@ export function searchKnowledge(brainRoot, query, { limit = 6, paths, minScore =
     const summary = page.summary.toLowerCase();
     const body = page.content.toLowerCase();
     let score = 0;
+    let titleHits = 0;
+    let headingHits = 0;
     const hits = [];
     for (const token of tokens) {
       let weight = 0;
-      if (title.includes(token)) weight += 5;
-      if (headings.includes(token)) weight += 3;
+      if (title.includes(token)) { weight += 5; titleHits += 1; }
+      if (headings.includes(token)) { weight += 3; headingHits += 1; }
       if (summary.includes(token)) weight += 2;
       if (body.includes(token)) weight += 1;
       if (weight) { score += weight; hits.push(token); }
@@ -133,6 +136,8 @@ export function searchKnowledge(brainRoot, query, { limit = 6, paths, minScore =
       const ageDays = (now - fs.statSync(file).mtimeMs) / 86400000;
       if (ageDays <= 30) score += 2;
     } catch { /* ignore */ }
+    // 只靠正文里零散出现的通用词不算召回：至少标题/小标题命中，或正文总分足够高。
+    if (!(titleHits || headingHits || score >= 12)) continue;
     if (score < minScore) continue;
     results.push({ path: relative, title: page.title, summary: page.summary, score, hits });
   }

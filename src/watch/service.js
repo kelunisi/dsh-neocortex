@@ -114,6 +114,7 @@ export class WatchService {
     this.updatedAt = updatedAt;
     this.repaired = [];
     this.readError = undefined;
+    try { this.onModeChange?.(mode); } catch { /* listener failures must not break the switch */ }
     return { status: 'updated', ...this.state() };
   }
 

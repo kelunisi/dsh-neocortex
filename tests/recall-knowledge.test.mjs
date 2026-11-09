@@ -24,6 +24,7 @@ function makeBrain() {
     '知识库/综合分析/公文写作六条路径.md': '# 公文写作六条路径\n\n> 摘要：从领导讲话派生选题的六条路径。\n\n正文：政策热点、市场需求、技术创新等。\n',
     '知识库/来源摘要/B站-每日金价 黄金走势.md': '# 每日金价 黄金走势\n\n> 摘要：金价与黄金走势的每日跟踪。\n\n正文：金价 黄金 走势。\n',
     '知识库/来源摘要/技能库.md': '# 技能库\n\n> 摘要：技能、插件、工作区、工具。\n\n正文：技能 插件 工作区 工具。\n',
+    '知识库/概念知识/流程说明.md': '# 流程说明\n\n> 摘要：一段与标题无关的正文。\n\n正文：这里顺便提到金价和走势，但标题不是这个主题。\n',
   };
   for (const [relative, content] of Object.entries(pages)) {
     const file = path.join(brain, relative);
@@ -127,4 +128,12 @@ test('R1-06 runtime context text does not pollute the recall query', () => {
   assert.equal(result.injected, true);
   assert.ok(result.recall.paths.includes('知识库/来源摘要/B站-每日金价 黄金走势.md'));
   assert.equal(result.recall.paths.includes('知识库/来源摘要/技能库.md'), false, 'runtime-context words must not steer recall');
+});
+
+test('R1-07 body-only mentions and generic process words do not trigger recall', () => {
+  clearKnowledgeCache();
+  const { brain } = makeBrain();
+  const byGold = searchKnowledge(brain, '金价走势', { limit: 10 });
+  assert.equal(byGold.some((page) => page.path === '知识库/概念知识/流程说明.md'), false, 'title must match, body-only mentions are not enough');
+  assert.equal(searchKnowledge(brain, '流程 继续 需要', { limit: 10 }).length, 0, 'generic process words produce no recall');
 });

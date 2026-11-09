@@ -6,6 +6,9 @@
 // so an `off` profile stays inert.
 
 import { WatchService } from './service.js';
+import { WatchScheduler } from './scheduler.js';
+import { pendingItems, loadQueue } from './queue.js';
+import { runDryRound } from './round.js';
 import { registerWatchTools } from './tools.js';
 
 /**
@@ -19,13 +22,30 @@ import { registerWatchTools } from './tools.js';
  */
 export function mountWatch({ ctx, dataDir, initialMode, config = {}, vendorDir, writer }) {
   const watch = new WatchService({ dataDir, initialMode });
+  const scheduler = new WatchScheduler({
+    dataDir,
+    watch,
+    pendingCount: () => pendingItems(loadQueue(dataDir)).length,
+    log: (line) => console.error('[watch]', line),
+    run: async ({ reason }) => {
+      // agent 档的受限会话装配在 P4.5；在此之前自动跑先走 code 管线，产物契约不变。
+      if (watch.mode === 'agent') console.error('[watch] agent 档尚未装配，自动跑暂用 code 管线');
+      return runDryRound({ ctx, dataDir, config, vendorDir, log: (line) => console.error('[watch]', line) });
+    },
+  });
   if (ctx && typeof ctx.effect === 'function') {
-    ctx.effect(() => () => watch.dispose(), 'dsh-neocortex: watch module');
+    ctx.effect(() => () => {
+      scheduler.stop();
+      return watch.dispose();
+    }, 'dsh-neocortex: watch module');
   }
+  // 只有开关不是 off 时才起定时器；切回 off 会立刻停掉。
+  watch.onModeChange = (mode) => {
+    if (mode === 'off') scheduler.stop();
+    else scheduler.start();
+  };
   // 体检、扫码登录、离线跑一轮、收/扔入库：被动注册，不调用就不产生任何网络/文件行为。
   registerWatchTools(ctx, { dataDir, config, vendorDir, watch, writer });
-  // P1 keeps the module inert even when the mode is on: the switch is stored and
-  // readable, but no timer or pipeline exists yet. P2 (harvest) and P6
-  // (scheduler) start from `watch.enabled()` here.
+  if (watch.enabled()) scheduler.start();
   return watch;
 }

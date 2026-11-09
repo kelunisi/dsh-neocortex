@@ -153,6 +153,8 @@ export class NeocortexRuntime {
    * 只给摘要，不给全文；同一页/同一条整个会话只出现一次。
    */
   buildRecallMessage({ snapshot, query, scene, state, turn, budgetChars }) {
+    const tokens = queryTokens(query);
+    if (!tokens.length) return null; // 没有实义检索词就不打扰
     const header = `[智脑] 回忆 · 第${turn || 1}轮`;
     const knowledgeLines = [];
     const memoryLines = [];
@@ -177,10 +179,9 @@ export class NeocortexRuntime {
       paths.push(page.path);
     }
 
-    const tokens = queryTokens(query);
     const relevant = snapshot.memories
       .filter((entry) => (entry.scene || '通用') === scene && !state.injectedMemoryIds.has(entry.id))
-      .filter((entry) => tokens.length === 0 || tokens.some((token) => entry.text.includes(token)))
+      .filter((entry) => tokens.some((token) => entry.text.includes(token)))
       .slice(0, 2);
     for (const entry of relevant) {
       if (memoryLines.length >= 2) break;
