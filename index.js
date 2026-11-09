@@ -8,6 +8,7 @@ import { DEFAULT_CONFIG, resolveConfig, sanitize } from './src/defaults.js';
 import { runP1HostProbe } from './src/p1-host-probe.js';
 import { MemoryWriter } from './src/writer.js';
 import { routeRecallMiss } from './src/recall.js';
+import { searchKnowledge } from './src/knowledge.js';
 import { LifecycleEngine } from './src/lifecycle.js';
 import { memoryPolicy } from './src/policy.js';
 import { WeeklyReview } from './src/review.js';
@@ -107,7 +108,7 @@ export function apply(ctx, rawConfig = {}) {
   ctx.systemPrompt.section({
     name: 'dsh-neocortex-memory',
     order: 60,
-    text: '智脑记忆：有后续召回价值时使用 neocortex_remember，普通聊天不要保存。个人往事注入未命中时使用 neocortex_recall；若返回 web_search 则改用网络检索。用户说“这次不用智脑”时不读写，说“这个不要记”时不保存指定内容。不得保存密码、凭据或无必要的敏感信息。面板状态、撤销、周回顾和参数使用 neocortex_panel；L1 确认与候选接受/拒绝不得代用户执行。',
+    text: '智脑记忆：有后续召回价值时使用 neocortex_remember，普通聊天不要保存。个人往事注入未命中时使用 neocortex_recall；查知识库用 neocortex_recall 并设 scope="knowledge"；若返回 web_search 则改用网络检索。用户说“这次不用智脑”时不读写，说“这个不要记”时不保存指定内容。不得保存密码、凭据或无必要的敏感信息。面板状态、撤销、周回顾和参数使用 neocortex_panel；L1 确认与候选接受/拒绝不得代用户执行。',
   });
 
   ctx.tools.register({
@@ -145,10 +146,13 @@ export function apply(ctx, rawConfig = {}) {
 
   ctx.tools.register({
     name: 'neocortex_recall',
-    description: '检索通用与沉睡个人往事；无结果时明确返回 unknown，外部知识问题返回 web_search 路由。',
+    description: '检索智脑：scope=personal 查个人往事（默认），scope=knowledge 查知识库来源摘要/概念页，scope=all 两者都查。个人往事无结果时明确返回 unknown，外部知识问题返回 web_search 路由。',
     parameters: {
       type: 'object',
-      properties: { query: { type: 'string', description: '要查找的个人往事或问题。' } },
+      properties: {
+        query: { type: 'string', description: '要查找的个人往事或知识问题。' },
+        scope: { type: 'string', enum: ['personal', 'knowledge', 'all'], description: '默认 personal；查知识库用 knowledge。' },
+      },
       required: ['query'],
       additionalProperties: false,
     },
@@ -159,8 +163,17 @@ export function apply(ctx, rawConfig = {}) {
     execute: async (args, exec) => {
       const userText = latestUserText(exec.agent);
       if (!memoryPolicy(userText).allowRead) return { kind: 'rejected', reason: 'user-opt-out' };
+      const scope = args.scope || 'personal';
+      const knowledge = () => searchKnowledge(brainRoot, args.query, { limit: 10 });
+      if (scope === 'knowledge') {
+        return sanitize({ kind: 'knowledge', query: args.query, results: knowledge() });
+      }
       const result = await routeRecallMiss({ brainRoot, query: args.query });
       if (result.results) result.results = result.results.slice(0, 10).map((entry) => ({ date: entry.date, text: entry.text, path: entry.sourcePath, status: entry.status }));
+      if (scope === 'all') {
+        const pages = knowledge();
+        return sanitize({ kind: pages.length || result.kind === 'personal' ? 'mixed' : result.kind, personal: result, knowledge: pages });
+      }
       return sanitize(result);
     },
   });

@@ -2,7 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { buildRecallPayload, detectScene, readBrainSnapshot } from './recall.js';
+import { searchKnowledge, queryTokens } from './knowledge.js';
 import { memoryPolicy } from './policy.js';
+import { truncateUnicode, unicodeLength } from './defaults.js';
 
 const OBSERVED_TYPES = new Set([
   'turn/start',
@@ -53,6 +55,8 @@ export class NeocortexRuntime {
         initialInjected: false,
         currentScene: '通用',
         injectedScenes: new Set(),
+        injectedKnowledge: new Set(),
+        injectedMemoryIds: new Set(),
         needsReinject: false,
         lastCompactionSeq: undefined,
         failedCompactions: 0,
@@ -144,6 +148,52 @@ export class NeocortexRuntime {
     return { recovered, ignored };
   }
 
+  /**
+   * 前 N 轮/首轮/压缩后的"回忆"：知识库（L2）+ 当前场景里与问题相关的近况（L3）。
+   * 只给摘要，不给全文；同一页/同一条整个会话只出现一次。
+   */
+  buildRecallMessage({ snapshot, query, scene, state, turn, budgetChars }) {
+    const header = `[智脑] 回忆 · 第${turn || 1}轮`;
+    const knowledgeLines = [];
+    const memoryLines = [];
+    const paths = [];
+    const memoryIds = [];
+    const compose = () => {
+      let text = header;
+      if (knowledgeLines.length) text += `\n[知识库]\n${knowledgeLines.join('\n')}`;
+      if (memoryLines.length) text += `\n[近况]\n${memoryLines.join('\n')}`;
+      return text;
+    };
+    const fits = (next) => unicodeLength(next) <= budgetChars;
+
+    const knowledge = searchKnowledge(this.brainRoot, query, { limit: 8, paths: state.injectedKnowledge });
+    const maxKnowledge = this.config.recallKnowledgeItems ?? 3;
+    for (const page of knowledge) {
+      if (knowledgeLines.length >= maxKnowledge) break;
+      const summary = page.summary ? `：${truncateUnicode(page.summary, 110)}` : '';
+      const line = `- ${page.title}（${page.path}）${summary}`;
+      knowledgeLines.push(line);
+      if (!fits(compose())) { knowledgeLines.pop(); break; }
+      paths.push(page.path);
+    }
+
+    const tokens = queryTokens(query);
+    const relevant = snapshot.memories
+      .filter((entry) => (entry.scene || '通用') === scene && !state.injectedMemoryIds.has(entry.id))
+      .filter((entry) => tokens.length === 0 || tokens.some((token) => entry.text.includes(token)))
+      .slice(0, 2);
+    for (const entry of relevant) {
+      if (memoryLines.length >= 2) break;
+      const line = `- ${truncateUnicode(entry.text, 120)}`;
+      memoryLines.push(line);
+      if (!fits(compose())) { memoryLines.pop(); break; }
+      memoryIds.push(entry.id);
+    }
+
+    if (!knowledgeLines.length && !memoryLines.length) return null;
+    return { text: compose(), paths, memoryIds, knowledgeCount: knowledgeLines.length, memoryCount: memoryLines.length };
+  }
+
   prepareInjection(agent, messages, turn) {
     if (!messages.length) return { messages, injected: false };
     const sessionId = agent.id;
@@ -157,38 +207,74 @@ export class NeocortexRuntime {
     const compaction = state.needsReinject;
     const sceneChanged = nextScene !== state.currentScene;
     const sceneIsNew = sceneChanged && !state.injectedScenes.has(nextScene);
-    if (!first && !compaction && !sceneIsNew) return { messages, injected: false, scene: nextScene };
-    const reason = compaction ? 'compaction' : first ? 'first' : 'scene-change';
-    const payload = buildRecallPayload({
-      snapshot,
-      ledger: this.ledger,
-      scene: nextScene,
-      includeGlobal: first || compaction,
-      reason,
-      maxItems: this.config.firstInjectionMaxItems,
-      maxChars: this.config.firstInjectionMaxChars,
-    });
-    this.ledger.recordInjection({
-      sessionId,
-      turn,
-      memoryIds: payload.selected.map((entry) => entry.id),
-      scene: nextScene,
-      reason,
-      payload: payload.text,
-    });
-    state.initialInjected = true;
-    state.currentScene = nextScene;
-    state.injectedScenes.add(nextScene);
-    state.needsReinject = false;
+    const recallTurns = Number.isInteger(this.config.recallTurns) ? this.config.recallTurns : 4;
+    const recallTurn = Number.isInteger(turn) && turn <= recallTurns;
+    if (!first && !compaction && !sceneIsNew && !recallTurn) return { messages, injected: false, scene: nextScene };
+
+    if (compaction) {
+      state.injectedKnowledge.clear();
+      state.injectedMemoryIds.clear();
+    }
+
+    const injectedMessages = [];
+    const reason = compaction ? 'compaction' : first ? 'first' : sceneIsNew ? 'scene-change' : 'recall';
+    let payload;
+    const personalWanted = first || compaction || sceneIsNew;
+    if (personalWanted) {
+      payload = buildRecallPayload({
+        snapshot,
+        ledger: this.ledger,
+        scene: nextScene,
+        includeGlobal: first || compaction,
+        reason,
+        maxItems: this.config.firstInjectionMaxItems,
+        maxChars: this.config.firstInjectionMaxChars,
+      });
+      this.ledger.recordInjection({
+        sessionId,
+        turn,
+        memoryIds: payload.selected.map((entry) => entry.id),
+        scene: nextScene,
+        reason,
+        payload: payload.text,
+      });
+      for (const entry of payload.selected) state.injectedMemoryIds.add(entry.id);
+      state.initialInjected = true;
+      state.currentScene = nextScene;
+      state.injectedScenes.add(nextScene);
+      state.needsReinject = false;
+      injectedMessages.push(createMemoryMessage(payload.text));
+    }
+
+    const budget = (first || compaction || sceneIsNew)
+      ? (this.config.recallKnowledgeChars ?? 360)
+      : (this.config.recallTurnChars ?? 600);
+    const recall = this.buildRecallMessage({ snapshot, query, scene: nextScene, state, turn, budgetChars: budget });
+    if (recall) {
+      injectedMessages.push(createMemoryMessage(recall.text));
+      for (const pagePath of recall.paths) state.injectedKnowledge.add(pagePath);
+      for (const id of recall.memoryIds) state.injectedMemoryIds.add(id);
+    }
+
+    if (!injectedMessages.length) return { messages, injected: false, scene: nextScene };
     this.probe(sessionId, { type: 'neocortex/injection', seq: null }, {
       turn,
       reason,
       scene: nextScene,
-      memoryIds: payload.selected.map((entry) => entry.id),
-      chars: payload.chars,
-      explanations: payload.explanations,
+      memoryIds: payload?.selected.map((entry) => entry.id) ?? [],
+      knowledgePaths: recall?.paths ?? [],
+      chars: payload?.chars ?? 0,
+      recallChars: recall ? unicodeLength(recall.text) : 0,
+      explanations: payload?.explanations ?? [],
     });
-    return { messages: [...messages, createMemoryMessage(payload.text)], injected: true, payload };
+    return {
+      messages: [...messages, ...injectedMessages],
+      injected: true,
+      payload,
+      recall,
+      scene: nextScene,
+      reason,
+    };
   }
 
   async preStep(agent, payload, next) {
