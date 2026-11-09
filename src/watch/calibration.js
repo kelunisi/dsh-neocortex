@@ -39,14 +39,17 @@ export function loadCalibration(dataDir, { limit = 8 } = {}) {
   if (!fs.existsSync(file)) return { file, entries: [] };
   try {
     const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean);
-    const entries = [];
+    const cleaned = [];
     for (const line of lines) {
-      try {
-        const record = JSON.parse(line);
-        if (record?.bvid && DECISIONS.includes(record.decision)) entries.push(record);
-      } catch { /* skip malformed line */ }
+      let record;
+      try { record = JSON.parse(line); } catch { continue; }
+      if (!record?.bvid || !DECISIONS.includes(record.decision)) continue;
+      // 同一视频只保留最后一次判定，避免新旧选择互相打架。
+      const index = cleaned.findIndex((item) => item.bvid === record.bvid);
+      if (index >= 0) cleaned.splice(index, 1);
+      cleaned.push(record);
     }
-    return { file, entries: entries.slice(-Math.max(1, limit)) };
+    return { file, entries: cleaned.slice(-Math.max(1, limit)) };
   } catch (error) {
     return { file, entries: [], error: String(error?.message || error) };
   }

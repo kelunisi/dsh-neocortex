@@ -56,10 +56,10 @@ export function pickCandidates(videos, criteria, { scanPerRound = 5, exploration
   });
   const keyword = scored.filter((item) => !item.triage.excluded && item.triage.score > 0)
     .sort((a, b) => b.triage.score - a.triage.score || pubdateDesc(a.video, b.video));
-  // 探索位只收"方向相关但不在必含词里"的：来自探索搜索，或命中关注方向词。
+  // 探索位只收"方向相关且标题像方法/教程"的：避免资讯汇总、vlog、美食混进来。
   const exploration = scored.filter((item) => !item.triage.excluded && item.triage.score === 0
-    && (item.video.origin === 'explore' || item.triage.directionHits.length > 0))
-    .sort((a, b) => b.triage.directionHits.length - a.triage.directionHits.length || playDesc(a.video, b.video) || pubdateDesc(a.video, b.video));
+    && item.triage.utilityHits.length > 0)
+    .sort((a, b) => b.triage.utilityHits.length - a.triage.utilityHits.length || b.triage.directionHits.length - a.triage.directionHits.length || playDesc(a.video, b.video) || pubdateDesc(a.video, b.video));
 
   const explorationSlots = Math.min(scanPerRound, Math.max(1, Math.round(scanPerRound * explorationRatio)));
   const keywordSlots = Math.max(0, scanPerRound - explorationSlots);
@@ -78,10 +78,12 @@ export function pickCandidates(videos, criteria, { scanPerRound = 5, exploration
   return picked;
 }
 
-/** Deep-read the highest-scoring picks first. */
+/** Deep-read the highest-scoring picks first; method/tutorial titles only break ties. */
 export function selectDeep(picked, deepPerRound = 3) {
   return [...picked]
-    .sort((a, b) => b.triage.score - a.triage.score || pubdateDesc(a.video, b.video))
+    .sort((a, b) => b.triage.score - a.triage.score
+      || (b.triage.utilityHits?.length || 0) - (a.triage.utilityHits?.length || 0)
+      || pubdateDesc(a.video, b.video))
     .slice(0, Math.max(0, deepPerRound));
 }
 

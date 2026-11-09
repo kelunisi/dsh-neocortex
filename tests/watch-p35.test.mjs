@@ -75,10 +75,27 @@ test('P35-03 low-confidence worth=true becomes pending', async () => {
   };
   const judgement = await understandVideo({
     ctx: {}, llm: fakeLlm, route: { provider: 'p', model: 'm' }, criteria,
-    video: video({ bvid: 'BVlow' }), subtitle: '', examples: [],
+    video: video({ bvid: 'BVlow' }), subtitle: '有字幕', examples: [],
   });
   assert.equal(judgement.worth, null);
   assert.match(judgement.reason, /低于 0\.5/);
+  assert.equal(judgement.subtitleMissing, false);
+});
+
+test('P35-07 a missing subtitle always becomes pending, even at high confidence', async () => {
+  const criteria = parseCriteria(CRITERIA);
+  const fakeLlm = {
+    async *stream() {
+      yield { type: 'text-delta', text: '{"worth":true,"confidence":0.95,"reason":"标题很相关","points":["p"],"topics":[]}' };
+      yield { type: 'finish', reason: { kind: 'stop' } };
+    },
+  };
+  const judgement = await understandVideo({
+    ctx: {}, llm: fakeLlm, route: { provider: 'p', model: 'm' }, criteria,
+    video: video({ bvid: 'BVnosub' }), subtitle: '', examples: [],
+  });
+  assert.equal(judgement.worth, null);
+  assert.match(judgement.reason, /无字幕/);
   assert.equal(judgement.subtitleMissing, true);
 });
 
@@ -102,12 +119,14 @@ test('P35-05 calibration appends and loads with invalid rows skipped', () => {
     { bvid: 'BV2', decision: 'rejected', title: 'B' },
     { bvid: '', decision: 'received' },
     { bvid: 'BV3', decision: 'maybe' },
+    { bvid: 'BV1', decision: 'rejected', title: 'A（改判）' },
   ]);
   assert.equal(result.ok, true);
-  assert.equal(result.count, 2);
+  assert.equal(result.count, 3);
   const loaded = loadCalibration(dataDir);
-  assert.equal(loaded.entries.length, 2);
-  assert.deepEqual(loaded.entries.map((item) => item.decision), ['received', 'rejected']);
+  assert.equal(loaded.entries.length, 2, 'same video keeps only the latest decision');
+  assert.deepEqual(loaded.entries.map((item) => item.bvid), ['BV2', 'BV1']);
+  assert.equal(loaded.entries.find((item) => item.bvid === 'BV1').decision, 'rejected');
 });
 
 test('P35-06 report carries subtitle_missing', () => {

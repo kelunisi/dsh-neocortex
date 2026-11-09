@@ -103,21 +103,25 @@ export function directionTokens(criteria) {
   return out;
 }
 
+const UTILITY_TERMS = ['教程', '模板', '模版', '设置', '步骤', '实操', '方法', '案例', '清单', '流程', '指南', '技巧'];
+
 /**
- * @returns {{score:number, hits:string[], excluded:boolean, reason:string, directionHits:string[]}}
+ * @returns {{score:number, hits:string[], excluded:boolean, reason:string, directionHits:string[], utilityHits:string[]}}
  */
 export function scoreCandidate(video, criteria) {
   const haystack = `${video?.title || ''} ${video?.description || ''}`.toLowerCase();
   const excludedHits = (criteria.exclude || []).filter((word) => word && haystack.includes(String(word).toLowerCase()));
   if (excludedHits.length) {
-    return { score: -1, hits: excludedHits, excluded: true, reason: `命中排除词：${excludedHits.join('/')}`, directionHits: [] };
+    return { score: -1, hits: excludedHits, excluded: true, reason: `命中排除词：${excludedHits.join('/')}`, directionHits: [], utilityHits: [] };
   }
   const mustHits = (criteria.must || []).filter((word) => word && haystack.includes(String(word).toLowerCase()));
   const plusHits = (criteria.plus || []).filter((word) => word && haystack.includes(String(word).toLowerCase()));
   const directionHits = directionTokens(criteria).filter((word) => haystack.includes(word.toLowerCase()));
+  // 只认标题里的"方法/教程/模板"信号：简介里的词太容易把资讯/广告带进来。
+  const utilityHits = UTILITY_TERMS.filter((word) => String(video?.title || '').toLowerCase().includes(word));
   const score = mustHits.length * 10 + plusHits.length * 2;
   const reason = mustHits.length
     ? `必含词 ${mustHits.slice(0, 4).join('/')}${plusHits.length ? `；加分 ${plusHits.slice(0, 3).join('/')}` : ''}`
     : plusHits.length ? `加分词 ${plusHits.slice(0, 4).join('/')}` : '无关键词命中（探索候选）';
-  return { score, hits: [...mustHits, ...plusHits], excluded: false, reason, directionHits };
+  return { score, hits: [...mustHits, ...plusHits], excluded: false, reason, directionHits, utilityHits };
 }

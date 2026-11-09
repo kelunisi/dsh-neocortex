@@ -141,7 +141,11 @@ export async function understandVideo({ ctx, llm, route, criteria, video, subtit
   const text = await callModel({ llm, route, system, user, signal });
   const judgement = normalizeJudgement(extractJudgement(text), video);
   judgement.subtitleMissing = !subtitle || !subtitle.trim();
-  if (judgement.worth === true && judgement.confidence < 0.5) {
+  if (judgement.subtitleMissing) {
+    // 没有字幕就不能替用户"收"：只给待定，让人来判。
+    judgement.worth = null;
+    judgement.reason = `${judgement.reason || ''}（无字幕，转待定）`.slice(0, 300);
+  } else if (judgement.worth === true && judgement.confidence < 0.5) {
     judgement.worth = null;
     judgement.reason = `${judgement.reason || '低置信度'}（置信度 ${judgement.confidence.toFixed(2)} 低于 0.5，转待定）`.slice(0, 300);
   }
