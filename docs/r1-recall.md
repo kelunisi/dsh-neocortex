@@ -1,0 +1,40 @@
+# R1 验收记录：前 4 轮「回忆」
+
+> 日期：2026-11-09 · 纯本地检索，无额外模型调用 · 不影响每轮对话之后的上下文
+
+## 交付物
+
+| 文件 | 作用 |
+|---|---|
+| `src/knowledge.js` | 知识库本地索引：扫 `知识库/` 下 Markdown，标题/小标题/摘要/正文分层打分；中文 bigram；跳过 YAML frontmatter；`minScore` 过滤噪声 |
+| `src/runtime.js` | 首轮：个人模型 + 场景 + 近况（原有）；再加最多 3 页知识库。第 2–4 轮：按当前问题检索知识库 + 当前场景近况，≤600 字符；第 5 轮起停止；压缩后重新打开 |
+| `index.js` | `neocortex_recall` 增加 `scope: personal / knowledge / all`；systemPrompt 提示"查知识库用 scope=knowledge" |
+| `src/defaults.js` | `recallTurns=4`、`recallKnowledgeItems=3`、`recallKnowledgeChars=360`、`recallTurnChars=600` |
+| `tests/recall-knowledge.test.mjs` | R1-01–05 |
+
+## 行为
+
+- 新会话第 1 轮：原有个人模型/场景/近况注入（≤800 字符）+ 知识库最多 3 页（≤360 字符）；
+- 第 2–4 轮：按当前用户问题检索知识库 + 同场景近况，≤600 字符；
+- 同一页/同一条整个会话只出现一次；
+- 第 5 轮起不再主动注入；压缩后重新打开；场景切换补一次；
+- `neocortex_recall(scope="knowledge")` 可随时按需再查。
+
+## 实跑证据（真实脑库）
+
+用 `sandbox/recall-sim.mjs` 对真实脑库模拟 3 轮：
+
+| 轮次 | 用户问题 | 召回 |
+|---|---|---|
+| 1 | Grok Bot 怎么用？三层结构那个教程 | `B站-Grok Bot 纯享版小白零基础教程.md`（+1 条对象档案） |
+| 2 | 现在显卡价格怎么样？5080 降了吗 | 显卡日报、电脑配件价格汇报 2 页 + 内存降价近况 |
+| 3 | 最近金价走势如何 | `B站-每日金价 黄金走势.md` |
+
+线上 `neocortex_recall(scope="knowledge", query="Grok Bot 教程")` 也返回了正确的来源页与摘要。
+
+## 已知边界
+
+- 纯关键词（bigram），不做语义同义词扩展；"怎么省钱"和"省钱方法"能命中，但"降本"这类近义表达可能漏。
+- 第 1 轮偶尔会多带一条对象档案（实跑里"淋雨家个人站"混入）；`minScore=5` 已过滤掉大部分，后续可继续调阈值。
+- 前 4 轮的预算与条数暂时写死，P7 再上面板滑块。
+- 只对新会话生效；老会话不回溯。

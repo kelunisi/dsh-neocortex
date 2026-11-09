@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 喂养（watch）模块的 P1 骨架：`src/watch/`、三档开关（`off` / `code` / `agent`，默认 `off`）、`<dataDir>/watch.json` 原子持久化，以及 Web 面板的「喂养」页签。开关能存能读；`off` 时不启动定时器、不抓取、不发送、不创建文件。
 - P0 技术结论 [`docs/p0-agent-mode.md`](docs/p0-agent-mode.md)：`agent` 模式可行，但需要随包交付一个 agent preset 行，并依赖 Host 的 `agentPresets.mount()`；`code` 模式不依赖这些，仍是默认推荐。
 - P2 数据层：vendor `bilibili-mcp`（MIT，锁定上游提交，不跟踪更新）；自带极小 MCP stdio 客户端；只读工具白名单在 MCP 进程侧用 `BILI_MCP_TOOLS` 强制；`watch_selftest` 五项体检（Python / 脚本 / 依赖 / 登录态 / ffmpeg）；`watch_login` 扫码登录（B 站 passport 接口，凭证落在数据目录并收紧权限）。
+- R1 回忆：本地知识库索引（标题/小标题/摘要/正文分层打分，中文 bigram）；新会话前 4 轮按用户问题注入知识库与近况，首轮 ≤360 字符知识、2–4 轮 ≤600 字符；`neocortex_recall` 增加 `scope=knowledge|all` 分支；压缩后重新打开。
 
 ### Changed
 
