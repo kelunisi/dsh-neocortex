@@ -55,7 +55,7 @@ test('P3-03 pickCandidates reserves one exploration slot and drops excluded vide
   const criteria = parseCriteria(CRITERIA);
   const keywordVideos = Array.from({ length: 6 }, (_, index) => video({ bvid: `BVkw${index}`, title: `信息报送技巧 ${index}`, play: 1000 + index }));
   const exploreVideos = [
-    video({ bvid: 'BVex1', title: '一个陌生但可能有用的方法', play: 90000, description: '' }),
+    video({ bvid: 'BVex1', title: '一个陌生但可能有用的方法', play: 90000, description: '', origin: 'explore' }),
     video({ bvid: 'BVex2', title: '鸡汤一条', description: '', play: 99999 }),
   ];
   const picked = pickCandidates([...keywordVideos, ...exploreVideos], criteria, { scanPerRound: 5, explorationRatio: 0.2 });
@@ -125,9 +125,11 @@ test('P3-08 a dry round runs end to end with fake harvest and fake model', async
     async call(name, args) {
       calls.push({ name, args });
       if (name === 'bili_search') {
+        if (/方法|案例/.test(String(args.keyword))) {
+          return { videos: [video({ bvid: 'BVex1', title: '公文写作的实用方法', description: '' })] };
+        }
         return { videos: [video({ bvid: 'BVkw1', title: '信息报送三段式' }), video({ bvid: 'BVkw2', title: '标准化试点' })] };
       }
-      if (name === 'bili_recommend') return { videos: [video({ bvid: 'BVex1', title: '一个陌生方法', description: '' })] };
       if (name === 'bili_subtitle') return { subtitles: [{ text: '字幕正文：背景、做法、成效。' }] };
       return {};
     },

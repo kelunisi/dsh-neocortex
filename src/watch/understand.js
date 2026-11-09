@@ -36,14 +36,19 @@ export function normalizeSubtitle(result) {
   return '';
 }
 
-export function buildUnderstandingPrompt({ criteria, video, subtitle }) {
+export function buildUnderstandingPrompt({ criteria, video, subtitle, examples = [] }) {
   const persona = criteria.persona || '一个需要持续吸收可落地知识的人';
   const directions = (criteria.directions || []).map((item, index) => `${index + 1}. ${item}`).join('\n');
+  const exampleLines = (examples || []).slice(0, 8).map((item) => {
+    const label = item.decision === 'received' ? '收' : '扔';
+    return `- ${label}：${item.title || item.bvid}`;
+  }).join('\n');
   const system = [
     '你是智脑"喂养"模块的判读员。任务：判断一条 B 站视频是否包含值得入库的"知识点"。',
     '只输出一个 JSON 对象，不要 Markdown 代码块，不要额外解释。',
     'JSON 格式：{"worth":true|false,"confidence":0到1,"reason":"一句话判据","points":["要点1","要点2","要点3"],"topics":["主题1"]}',
     '要求：points 最多 3 条、每条不超过 60 字；worth=false 时 points 可为空；判据要具体，不要写"内容不错"这类空话。',
+    '如果用户过去选择里"收"的多是某类内容，"扔"的多是另一类，请据此调整标准；边界模糊时宁可给 false 或较低 confidence。',
   ].join('\n');
   const text = subtitle && subtitle.trim()
     ? subtitle.trim().slice(0, MAX_SUBTITLE_CHARS)
@@ -51,6 +56,7 @@ export function buildUnderstandingPrompt({ criteria, video, subtitle }) {
   const user = [
     `【人设】${persona}`,
     directions ? `【关注方向】\n${directions}` : '',
+    exampleLines ? `【你过去的选择（学习用）】\n${exampleLines}` : '',
     `【视频】${video.title}`,
     `【UP】${video.author || '未知'} ｜ 时长 ${video.duration || '未知'} ｜ 播放 ${video.play ?? 0}`,
     video.description ? `【简介】${video.description.slice(0, 800)}` : '',
@@ -130,11 +136,15 @@ export async function callModel({ llm, route, system, user, signal, maxTokens = 
   return text;
 }
 
-export async function understandVideo({ ctx, llm, route, criteria, video, subtitle, signal }) {
-  const { system, user } = buildUnderstandingPrompt({ criteria, video, subtitle });
+export async function understandVideo({ ctx, llm, route, criteria, video, subtitle, examples = [], signal }) {
+  const { system, user } = buildUnderstandingPrompt({ criteria, video, subtitle, examples });
   const text = await callModel({ llm, route, system, user, signal });
   const judgement = normalizeJudgement(extractJudgement(text), video);
   judgement.subtitleMissing = !subtitle || !subtitle.trim();
+  if (judgement.worth === true && judgement.confidence < 0.5) {
+    judgement.worth = null;
+    judgement.reason = `${judgement.reason || '低置信度'}（置信度 ${judgement.confidence.toFixed(2)} 低于 0.5，转待定）`.slice(0, 300);
+  }
   judgement.replyPreview = text.slice(0, 500);
   return judgement;
 }

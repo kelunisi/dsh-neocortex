@@ -92,20 +92,32 @@ export function loadCriteria(dataDir) {
   }
 }
 
+export function directionTokens(criteria) {
+  const out = [];
+  for (const direction of criteria?.directions || []) {
+    for (const token of String(direction).split(/[、，,;；/\s]+/)) {
+      const value = token.trim();
+      if (value.length >= 2 && !out.includes(value)) out.push(value);
+    }
+  }
+  return out;
+}
+
 /**
- * @returns {{score:number, hits:string[], excluded:boolean, reason:string}}
+ * @returns {{score:number, hits:string[], excluded:boolean, reason:string, directionHits:string[]}}
  */
 export function scoreCandidate(video, criteria) {
   const haystack = `${video?.title || ''} ${video?.description || ''}`.toLowerCase();
   const excludedHits = (criteria.exclude || []).filter((word) => word && haystack.includes(String(word).toLowerCase()));
   if (excludedHits.length) {
-    return { score: -1, hits: excludedHits, excluded: true, reason: `命中排除词：${excludedHits.join('/')}` };
+    return { score: -1, hits: excludedHits, excluded: true, reason: `命中排除词：${excludedHits.join('/')}`, directionHits: [] };
   }
   const mustHits = (criteria.must || []).filter((word) => word && haystack.includes(String(word).toLowerCase()));
   const plusHits = (criteria.plus || []).filter((word) => word && haystack.includes(String(word).toLowerCase()));
+  const directionHits = directionTokens(criteria).filter((word) => haystack.includes(word.toLowerCase()));
   const score = mustHits.length * 10 + plusHits.length * 2;
   const reason = mustHits.length
     ? `必含词 ${mustHits.slice(0, 4).join('/')}${plusHits.length ? `；加分 ${plusHits.slice(0, 3).join('/')}` : ''}`
     : plusHits.length ? `加分词 ${plusHits.slice(0, 4).join('/')}` : '无关键词命中（探索候选）';
-  return { score, hits: [...mustHits, ...plusHits], excluded: false, reason };
+  return { score, hits: [...mustHits, ...plusHits], excluded: false, reason, directionHits };
 }

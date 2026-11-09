@@ -20,6 +20,7 @@ export function normalizeVideo(item) {
     duration: String(item.duration || ''),
     pubdate: Number(item.pubdate ?? 0),
     description: String(item.description || '').trim(),
+    origin: item.origin === 'explore' ? 'explore' : undefined,
   };
 }
 
@@ -55,8 +56,10 @@ export function pickCandidates(videos, criteria, { scanPerRound = 5, exploration
   });
   const keyword = scored.filter((item) => !item.triage.excluded && item.triage.score > 0)
     .sort((a, b) => b.triage.score - a.triage.score || pubdateDesc(a.video, b.video));
-  const exploration = scored.filter((item) => !item.triage.excluded && item.triage.score === 0)
-    .sort((a, b) => playDesc(a.video, b.video) || pubdateDesc(a.video, b.video));
+  // 探索位只收"方向相关但不在必含词里"的：来自探索搜索，或命中关注方向词。
+  const exploration = scored.filter((item) => !item.triage.excluded && item.triage.score === 0
+    && (item.video.origin === 'explore' || item.triage.directionHits.length > 0))
+    .sort((a, b) => b.triage.directionHits.length - a.triage.directionHits.length || playDesc(a.video, b.video) || pubdateDesc(a.video, b.video));
 
   const explorationSlots = Math.min(scanPerRound, Math.max(1, Math.round(scanPerRound * explorationRatio)));
   const keywordSlots = Math.max(0, scanPerRound - explorationSlots);

@@ -5,6 +5,7 @@
 
 import fs from 'node:fs';
 import { sanitize } from '../defaults.js';
+import { appendDecisions } from './calibration.js';
 import { loginPoll, loginStart, qrDataUrl, renderQrPng, saveCredential } from './login.js';
 import { credentialFile, readCredential, resolvePython, venvPython } from './python.js';
 import { runDryRound } from './round.js';
@@ -141,10 +142,44 @@ function createRunTool(context) {
   };
 }
 
+function createFeedbackTool(context) {
+  return {
+    name: 'watch_feedback',
+    description: '记录用户对知识点的"收/扔"判定，写入 <dataDir>/watch/calibration.jsonl；下一轮判读会把这些例子作为 few-shot。',
+    parameters: {
+      type: 'object',
+      properties: {
+        decisions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              bvid: { type: 'string' },
+              decision: { type: 'string', enum: ['received', 'rejected'] },
+              title: { type: 'string' },
+              note: { type: 'string' },
+            },
+            required: ['bvid', 'decision'],
+            additionalProperties: false,
+          },
+          description: '每条视频一个判定；received=收，rejected=扔。',
+        },
+      },
+      required: ['decisions'],
+      additionalProperties: false,
+    },
+    output: {
+      schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+    },
+    execute: async (args) => sanitize(appendDecisions(context.dataDir, args?.decisions)),
+  };
+}
+
 export function registerWatchTools(ctx, { dataDir, config = {}, vendorDir = defaultVendorDir(), watch } = {}) {
   if (!ctx?.tools?.register) return [];
   const context = { ctx, dataDir, config, vendorDir, watch };
-  const tools = [createSelftestTool(context), createLoginTool(context), createRunTool(context)];
+  const tools = [createSelftestTool(context), createLoginTool(context), createRunTool(context), createFeedbackTool(context)];
   for (const tool of tools) {
     try { ctx.tools.register(tool); } catch (error) { console.error('[dsh-neocortex] watch tool registration failed', error); }
   }

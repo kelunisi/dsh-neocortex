@@ -3,7 +3,8 @@
  * P3 只做 dry-run：不写智脑、不发评论、不互动。
  */
 
-import { loadCriteria } from './criteria.js';
+import { loadCriteria, directionTokens } from './criteria.js';
+import { loadCalibration } from './calibration.js';
 import { createBiliClient } from './bili.js';
 import { dedupeVideos, pickCandidates, selectDeep } from './triage.js';
 import { normalizeSubtitle, resolveModelRoute, understandVideo } from './understand.js';
@@ -15,6 +16,21 @@ function videosOf(result) {
   if (Array.isArray(result?.data)) return result.data;
   if (Array.isArray(result?.data?.videos)) return result.data.videos;
   return [];
+}
+
+/**
+ * 探索位不再用首页推荐：用"关注方向里不在必含词中的词"去搜，
+ * 这样捡到的是方向相关但字面没命中必含词的内容。
+ */
+export function buildExploreQueries(criteria, max = 2) {
+  const must = (criteria.must || []).map((word) => String(word).toLowerCase());
+  const tokens = directionTokens(criteria).filter((token) => {
+    const value = token.toLowerCase();
+    return !must.some((word) => word && (value.includes(word) || word.includes(value)));
+  });
+  const pool = tokens.length ? tokens : (criteria.plus || []);
+  const suffixes = [' 方法', ' 案例'];
+  return pool.slice(0, max).map((token, index) => `${token}${suffixes[index % suffixes.length]}`.trim());
 }
 
 export async function runDryRound({
@@ -37,6 +53,8 @@ export async function runDryRound({
   const queries = Array.isArray(config.queries) && config.queries.length
     ? config.queries.filter(Boolean).slice(0, 4)
     : (criteria.must.length ? criteria.must.slice(0, 3) : ['知识']);
+  const exploreQueries = buildExploreQueries(criteria, 2);
+  const examples = loadCalibration(dataDir, { limit: 8 }).entries;
 
   const { client } = clientFactory({ dataDir, config, vendorDir, log });
   try {
@@ -48,12 +66,16 @@ export async function runDryRound({
       collected.push(...videos);
       log(`搜索「${keyword}」：${videos.length} 条`);
     }
-    try {
-      const recommend = await client.call('bili_recommend', { ps: 10 }, { timeoutMs: 45000, signal });
-      collected.push(...videosOf(recommend));
-      log(`推荐位：${videosOf(recommend).length} 条`);
-    } catch (error) {
-      log(`推荐位抓取失败：${String(error?.message || error)}`);
+    for (const keyword of exploreQueries) {
+      if (signal?.aborted) throw new Error('已取消');
+      try {
+        const result = await client.call('bili_search', { keyword, num: 8, order: 'totalrank', page: 1 }, { timeoutMs: 45000, signal });
+        const videos = videosOf(result).map((video) => ({ ...video, origin: 'explore' }));
+        collected.push(...videos);
+        log(`探索「${keyword}」：${videos.length} 条`);
+      } catch (error) {
+        log(`探索搜索失败「${keyword}」：${String(error?.message || error)}`);
+      }
     }
 
     const all = dedupeVideos(collected);
@@ -72,7 +94,7 @@ export async function runDryRound({
       } catch (error) {
         log(`字幕获取失败 ${entry.video.bvid}：${String(error?.message || error)}`);
       }
-      const judgement = await understandVideo({ ctx, llm: model, route: modelRoute, criteria, video: entry.video, subtitle, signal });
+      const judgement = await understandVideo({ ctx, llm: model, route: modelRoute, criteria, video: entry.video, subtitle, examples, signal });
       deepById.set(entry.video.bvid, judgement);
       log(`判读 ${entry.video.bvid}：${judgement.worth === true ? '值得收' : judgement.worth === false ? '跳过' : '待定'}`);
     }
@@ -91,6 +113,8 @@ export async function runDryRound({
       ...report,
       route: modelRoute,
       queries,
+      exploreQueries,
+      calibrationExamples: examples.length,
       totalCandidates: all.length,
       picked: picked.map((entry) => ({
         bvid: entry.video.bvid,

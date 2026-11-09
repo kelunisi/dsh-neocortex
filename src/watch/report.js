@@ -45,6 +45,7 @@ export function writeRoundReport({ dataDir, date, picked, deepById, route, crite
       else lines.push('- （模型未给出要点）');
       lines.push(`**结论**：${deep.worth === true ? '值得收' : deep.worth === false ? '跳过' : '待定'}（置信度 ${Number(deep.confidence || 0).toFixed(2)}）`);
       lines.push(`**判读**：${deep.reason || '—'}`);
+      lines.push(`**字幕**：${deep.subtitleMissing ? '无（仅凭标题与简介）' : '有'}`);
     } else {
       lines.push('**结论**：粗筛入选，未深读');
     }
@@ -67,6 +68,7 @@ export function writeRoundReport({ dataDir, date, picked, deepById, route, crite
       dry: verdict === 'dry-run',
       triage: { score: triage.score, bucket: entry.bucket, hits: triage.hits },
       confidence: deep ? deep.confidence : null,
+      subtitle_missing: deep ? Boolean(deep.subtitleMissing) : null,
       ts: new Date(now).toISOString(),
     });
   }
