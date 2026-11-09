@@ -198,7 +198,10 @@ export class NeocortexRuntime {
     if (!messages.length) return { messages, injected: false };
     const sessionId = agent.id;
     const state = this.state(sessionId);
-    const query = messageText(messages.filter((message) => message.source?.kind !== 'dsh-neocortex'));
+    // 只拿真正的用户输入做检索；runtime-context / memory 注入不算"用户问题"，
+    // 否则系统提示里的“技能/插件/工作区”会把金价这类问题挤掉。
+    const userMessages = messages.filter((message) => message.source?.kind !== 'dsh-neocortex' && message.source?.kind !== 'runtime-context');
+    const query = messageText(userMessages) || messageText(messages.filter((message) => message.source?.kind !== 'dsh-neocortex'));
     if (!memoryPolicy(query).allowRead) state.optedOut = true;
     if (state.optedOut) return { messages, injected: false, optedOut: true };
     const snapshot = readBrainSnapshot(this.brainRoot);

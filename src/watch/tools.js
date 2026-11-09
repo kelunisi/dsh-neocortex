@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import { sanitize } from '../defaults.js';
 import { appendDecisions } from './calibration.js';
+import { hydrateItems } from './hydrate.js';
 import { acceptItems, rejectItems } from './ingest.js';
 import { loginPoll, loginStart, qrDataUrl, renderQrPng, saveCredential } from './login.js';
 import { credentialFile, readCredential, resolvePython, venvPython } from './python.js';
@@ -181,7 +182,8 @@ function createFeedbackTool(context) {
 function createIngestTool(context) {
   return {
     name: 'watch_ingest',
-    description: '处理待确认队列：accept 把条目写进智脑（L2 来源摘要 + L3 近况），reject 只留跳过原因。ids 省略或 all=true 时处理全部待判条目。',
+    description: '处理待确认队列：accept 把条目写进智脑（L2 来源摘要 + L3 近况），reject 只留跳过原因。ids 省略或 all=true 时处理全部待判条目；accept 默认先给没有要点的条目补一次深读。',
+    timeoutMs: 900000,
     parameters: {
       type: 'object',
       properties: {
@@ -189,6 +191,7 @@ function createIngestTool(context) {
         ids: { type: 'array', items: { type: 'string' }, description: '队列条目 id 或 bvid；省略时配合 all=true。' },
         all: { type: 'boolean', description: 'true 表示处理全部待判条目。' },
         note: { type: 'string', description: '可选备注，写进队列。' },
+        hydrate: { type: 'boolean', description: 'accept 时是否给无要点条目补深读，默认 true。' },
       },
       required: ['decision'],
       additionalProperties: false,
@@ -197,18 +200,34 @@ function createIngestTool(context) {
       schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
       render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
     },
-    execute: async (args) => {
+    execute: async (args, exec) => {
       try {
         const queue = loadQueue(context.dataDir);
         if (!queue.items.length) return sanitize({ ok: false, reason: 'queue-empty', message: '待确认队列是空的。' });
         const ids = Array.isArray(args?.ids) && args.ids.length ? args.ids : (!args?.all ? undefined : null);
         if (!ids && args?.all !== true) return sanitize({ ok: false, reason: 'ids-required', message: '给 ids，或 all=true。' });
+        const idSet = ids ? new Set(ids) : null;
+        const selected = queue.items.filter((item) => item.status === 'pending'
+          && (!idSet || idSet.has(item.id) || idSet.has(item.bvid)));
         if (args.decision === 'accept') {
           if (!context.writer) return sanitize({ ok: false, reason: 'writer-unavailable' });
+          let hydration;
+          const empty = selected.filter((item) => !Array.isArray(item.points) || item.points.length === 0);
+          if (args.hydrate !== false && context.ctx && empty.length) {
+            hydration = await hydrateItems({
+              ctx: context.ctx,
+              dataDir: context.dataDir,
+              config: context.config,
+              vendorDir: context.vendorDir,
+              items: empty,
+              signal: exec?.signal,
+              log: (line) => console.error('[watch]', line),
+            });
+          }
           const result = acceptItems({ writer: context.writer, queue, dataDir: context.dataDir, sessionId: 'watch-ingest', ids: ids || undefined });
           saveQueue(context.dataDir, queue);
           const remaining = queue.items.filter((item) => item.status === 'pending').length;
-          return sanitize({ ok: true, decision: 'accept', ...result, remaining, queueFile: queue.file });
+          return sanitize({ ok: true, decision: 'accept', ...result, hydration, remaining, queueFile: queue.file });
         }
         const result = rejectItems({ queue, ids: ids || undefined, note: args?.note });
         saveQueue(context.dataDir, queue);

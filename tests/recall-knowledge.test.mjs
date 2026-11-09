@@ -22,6 +22,8 @@ function makeBrain() {
     '知识库/来源摘要/B站-信息报送三段式.md': '# 信息报送三段式\n\n> 摘要：背景、做法、成效三段式写法，缺一段容易被退。\n\n正文：信息报送要写清楚背景、做法、成效。\n',
     '知识库/概念知识/基层减负.md': '# 基层减负\n\n> 摘要：数据一次采集、多口复用，减少基层重复填报。\n\n正文：基层减负的抓手是数据复用。\n',
     '知识库/综合分析/公文写作六条路径.md': '# 公文写作六条路径\n\n> 摘要：从领导讲话派生选题的六条路径。\n\n正文：政策热点、市场需求、技术创新等。\n',
+    '知识库/来源摘要/B站-每日金价 黄金走势.md': '# 每日金价 黄金走势\n\n> 摘要：金价与黄金走势的每日跟踪。\n\n正文：金价 黄金 走势。\n',
+    '知识库/来源摘要/技能库.md': '# 技能库\n\n> 摘要：技能、插件、工作区、工具。\n\n正文：技能 插件 工作区 工具。\n',
   };
   for (const [relative, content] of Object.entries(pages)) {
     const file = path.join(brain, relative);
@@ -108,4 +110,21 @@ test('R1-05 compaction re-opens knowledge recall', () => {
   const after = runtime.prepareInjection(agent, [message('基层减负')], 6);
   assert.equal(after.injected, true);
   assert.ok(after.recall.paths.includes('知识库/概念知识/基层减负.md'));
+});
+
+test('R1-06 runtime context text does not pollute the recall query', () => {
+  clearKnowledgeCache();
+  const { dir, brain } = makeBrain();
+  const runtime = runtimeAt(dir, brain);
+  const agent = { id: 'session-r1-context' };
+  const contextMessage = {
+    id: crypto.randomUUID(),
+    role: 'user',
+    source: { kind: 'runtime-context' },
+    content: [{ type: 'text', text: '技能 插件 工作区 工具 知识库' }],
+  };
+  const result = runtime.prepareInjection(agent, [contextMessage, message('金价走势怎么样')], 1);
+  assert.equal(result.injected, true);
+  assert.ok(result.recall.paths.includes('知识库/来源摘要/B站-每日金价 黄金走势.md'));
+  assert.equal(result.recall.paths.includes('知识库/来源摘要/技能库.md'), false, 'runtime-context words must not steer recall');
 });
