@@ -46,11 +46,14 @@ You can also steer it in natural language: "skip the brain this time" (no read/w
 
 ## Feeding module (v0.5, in development)
 
-v0.5 adds a `src/watch/` feeding module to the same plugin, off by default. Only the P1 skeleton exists today:
+v0.5 adds a `src/watch/` feeding module to the same plugin, off by default. Current progress: P1 skeleton + P2 data layer.
 
 - **Settings → Plugins → Zhinao → Feeding** switches between `off / code / agent`; the state is persisted to `<dataDir>/watch.json`.
 - `off` is inert: no process, no tokens, no harvesting, no files.
-- Harvesting, triage, the pending queue, comments/DMs and the privacy gate arrive from P2 on. The `agent` mode waits for preset assembly validation; see [`docs/p0-agent-mode.md`](docs/p0-agent-mode.md).
+- From P2 on, two tools configure the runtime:
+  - `watch_selftest` (`action: "install"`) creates the venv, installs the Bilibili MCP requirements, then checks Python / script / deps / login / ffmpeg.
+  - `watch_login` (`action: "start"` / `"poll"`) runs QR login; the credential lands in `<dataDir>/watch/bili-mcp/bili_credential.json` with current-user-only permissions.
+- Harvest, triage, the pending queue, comments/DMs and the privacy gate arrive from P3 on. The `agent` mode waits for preset assembly validation; see [`docs/p0-agent-mode.md`](docs/p0-agent-mode.md).
 
 ## Uninstall
 

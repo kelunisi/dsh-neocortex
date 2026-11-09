@@ -46,11 +46,14 @@ Agent 获得三个工具：
 
 ## 喂养模块（v0.5 开发中）
 
-v0.5 在同一插件内新增 `src/watch/` 喂养模块，默认关闭。当前只完成 P1 骨架：
+v0.5 在同一插件内新增 `src/watch/` 喂养模块，默认关闭。当前进度：P1 骨架 + P2 数据层。
 
 - 在 **设置 → 插件 → 智脑 → 喂养** 切换 `off / code / agent` 三档，状态写入 `<dataDir>/watch.json`；
 - `off` 时零行为：不起进程、不花 token、不抓取、不写文件；
-- 抓取、判据、待确认队列、评论/私信与隐私闸从 P2 起逐步接入；`agent` 档位等待 preset 装配验证，结论见 [`docs/p0-agent-mode.md`](docs/p0-agent-mode.md)。
+- P2 起可用两个工具做首次配置：
+  - `watch_selftest`（`action: "install"`）创建 venv 并安装 B 站 MCP 依赖，然后体检 Python / 脚本 / 依赖 / 登录态 / ffmpeg；
+  - `watch_login`（`action: "start"` / `"poll"`）扫码登录，凭证保存在 `<dataDir>/watch/bili-mcp/bili_credential.json`，权限收紧到当前用户。
+- 抓取、判据、待确认队列、评论/私信与隐私闸从 P3 起逐步接入；`agent` 档位等待 P4.5 的 preset 装配，结论见 [`docs/p0-agent-mode.md`](docs/p0-agent-mode.md)。
 
 ## 卸载
 

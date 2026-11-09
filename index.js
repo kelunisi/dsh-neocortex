@@ -59,8 +59,14 @@ export function apply(ctx, rawConfig = {}) {
   const lifecycle = new LifecycleEngine({ brainRoot, ledger, writer, config });
   const review = new WeeklyReview({ brainRoot, ledger, writer, lifecycle, config });
   const panel = new PanelStateService({ brainRoot, dataDir, ledger, writer, lifecycle, review, config, templateRoot: path.join(packageRoot, 'templates', 'brain') });
-  // 喂养（watch）模块：P1 只有三档开关与持久化，默认 off 时零行为。
-  const watch = mountWatch({ ctx, dataDir, initialMode: rawConfig.watch?.mode });
+  // 喂养（watch）模块：P1 三档开关与持久化；P2 起接入只读 B 站 MCP、体检与扫码登录。
+  const watch = mountWatch({
+    ctx,
+    dataDir,
+    initialMode: rawConfig.watch?.mode,
+    config: rawConfig.watch || {},
+    vendorDir: path.join(packageRoot, 'vendor', 'bilibili-mcp'),
+  });
   new NeocortexRemoteService(ctx, panel, watch);
   const runtime = new NeocortexRuntime({
     ledger,
