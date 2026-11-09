@@ -10,7 +10,11 @@ import path from 'node:path';
 
 const KNOWLEDGE_ROOT = '知识库';
 const PAGE_CACHE = new Map(); // absolute path -> { mtimeMs, size, page }
-const STOPWORDS = new Set(['我的', '我们', '之前', '以前', '曾经', '记得', '什么', '怎么', '是否', '现在', '这个', '那个', '可以', '如何', '一下', '就是', '还是', '以及', '因为', '所以']);
+const STOPWORDS = new Set([
+  '我的', '我们', '之前', '以前', '曾经', '记得', '什么', '怎么', '是否', '现在', '这个', '那个', '可以', '如何', '一下', '就是', '还是', '以及', '因为', '所以',
+  // 通用词：在多数页面里都会出现，拿来做检索只会产生噪声
+  '默认', '内容', '需要', '没有', '情况', '判定', '深读', '浅度', '悬浮', '面板', '提示', '忘记', '也就是说', '还有', '如果', '但是', '一个', '进行', '使用', '问题', '时候', '知道', '看看',
+]);
 
 function walkMarkdown(root, dir, out = []) {
   let entries;
@@ -79,7 +83,7 @@ export function queryTokens(query) {
   const text = String(query || '');
   const tokens = new Set();
   for (const word of text.toLowerCase().split(/[\s，。？！、,.?!;；:：()（）\[\]【】"“”'']+/)) {
-    if (word.length >= 2 && !STOPWORDS.has(word)) tokens.add(word);
+    if (word.length >= 2 && word.length <= 12 && !STOPWORDS.has(word)) tokens.add(word);
   }
   const chinese = text.match(/[\u3400-\u9fff]+/g) || [];
   for (const part of chinese) {
