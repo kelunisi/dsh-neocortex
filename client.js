@@ -36,6 +36,7 @@ window.__ModuleLoader__.load({
       watchSchedule: '自动调度', watchLast: '上次结果', watchNext: '下次', watchNotScheduled: '未安排',
       watchFloatTitle: '今晚待判', watchClose: '收起', watchSaveWatch: '保存喂养参数', watchSavedWatch: '喂养参数已保存',
       watchDigesting: '补深读中…',
+      watchSuggest: '关注建议', watchRefresh: '刷新建议', watchNoSuggestions: '还没有建议，点“刷新建议”生成。',
     };
     const en = {
       tab: 'Neocortex', title: 'Neocortex Memory', subtitle: 'Markdown is authoritative; the ledger explains recall and lifecycle.',
@@ -67,6 +68,7 @@ window.__ModuleLoader__.load({
       watchSchedule: 'Scheduler', watchLast: 'Last result', watchNext: 'Next', watchNotScheduled: 'Not scheduled',
       watchFloatTitle: 'Pending review', watchClose: 'Collapse', watchSaveWatch: 'Save feeding settings', watchSavedWatch: 'Feeding settings saved',
       watchDigesting: 'Reading subtitles…',
+      watchSuggest: 'Follow ideas', watchRefresh: 'Refresh ideas', watchNoSuggestions: 'No ideas yet; tap Refresh ideas.',
     };
 
     const jsonCodec = {
@@ -80,7 +82,7 @@ window.__ModuleLoader__.load({
       state: false, previewReview: true, confirmL1: true, undo: true,
       acceptReview: true, rejectReview: true, manualReview: false, retryReview: false,
       updateSettings: true, initializeBrain: true, updateWatch: true,
-      watchOverview: false, watchDecide: true, updateWatchConfig: true,
+      watchOverview: false, watchDecide: true, updateWatchConfig: true, watchRefreshSuggestions: false,
     };
     const TYPERT_REMOTE = {
       package: 'dsh-neocortex',
@@ -118,6 +120,9 @@ window.__ModuleLoader__.load({
       .wf-ball{pointer-events:auto;width:46px;height:46px;border-radius:50%;border:1px solid var(--dsw-alias-brand-primary);background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25)}
       .wf-panel{pointer-events:auto;position:absolute;right:0;bottom:58px;width:min(380px,calc(100vw - 40px));max-height:520px;display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.3);color:var(--dsw-alias-label-primary);font-size:13px}
       .wf-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+      .wf-tabs{display:flex;gap:6px;padding:8px 12px 0}
+      .wf-tabs button{border:1px solid transparent;background:transparent;color:var(--dsw-alias-label-secondary);border-radius:7px 7px 0 0;padding:5px 9px;cursor:pointer;font-size:12px}
+      .wf-tabs button[data-active=true]{color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-border-l1);border-bottom-color:var(--dsw-alias-bg-layer-1);background:var(--dsw-alias-bg-layer-1)}
       .wf-list{overflow:auto;padding:6px 12px}
       .wf-item{padding:9px 0;border-bottom:1px dashed var(--dsw-alias-border-l1)}
       .wf-item:last-child{border-bottom:0}
@@ -330,6 +335,7 @@ window.__ModuleLoader__.load({
         const [error, setError] = useState('');
         const [open, setOpen] = useState(false);
         const [busy, setBusy] = useState(false);
+        const [tab, setTab] = useState('pending');
         const refresh = async () => {
           try {
             // 用面板同一个 state 接口，避免新增 remote 方法在旧客户端里不可用。
@@ -339,6 +345,7 @@ window.__ModuleLoader__.load({
               watch: value.watch,
               scheduler: value.watchScheduler,
               budget: value.watchBudget,
+              suggestions: value.watchSuggestions,
             });
             setError('');
           } catch (cause) {
@@ -353,12 +360,19 @@ window.__ModuleLoader__.load({
           return () => { alive = false; clearInterval(timer); };
         }, []);
         const pending = (data?.queue?.items || []).filter((item) => item.status === 'pending');
-        // 队列为空时不出现；还没取到数据时显示 …，取数失败显示 !，绝不静默消失。
-        if (data && !error && !pending.length) return null;
+        const suggestions = data?.suggestions?.items || [];
+        // 队列为空且没有关注建议时不出现；还没取到数据时显示 …，取数失败显示 !。
+        if (data && !error && !pending.length && !suggestions.length) return null;
         const decide = async (decision, ids) => {
           setBusy(true);
           try { await call('watchDecide', { decision, ids }); await refresh(); }
           catch { /* leave the item in place */ }
+          finally { setBusy(false); }
+        };
+        const refreshSuggestions = async () => {
+          setBusy(true);
+          try { await call('watchRefreshSuggestions'); await refresh(); setTab('suggest'); }
+          catch { /* keep the old list */ }
           finally { setBusy(false); }
         };
         const rows = pending.map((item) => h('div', { className: 'wf-item', key: item.id },
@@ -368,19 +382,32 @@ window.__ModuleLoader__.load({
           h('div', { className: 'nc-actions' },
             h('button', { className: 'nc-btn', disabled: busy, onClick: () => decide('accept', [item.id]) }, t('watchAccept')),
             h('button', { className: 'nc-btn', disabled: busy, onClick: () => decide('reject', [item.id]) }, t('watchReject')))));
+        const suggestionRows = suggestions.map((entry) => h('div', { className: 'wf-item', key: entry.mid || entry.up },
+          h('div', { className: 'wf-title' }, entry.up),
+          h('div', { className: 'wf-meta' }, entry.reason),
+          entry.examples?.[0] ? h('div', { className: 'wf-meta' }, `例：《${entry.examples[0].title}》`) : null));
         return h('div', { className: 'wf-root' },
           open ? h('div', { className: 'wf-panel' },
             h('div', { className: 'wf-head' },
               h('b', null, error ? `${t('watchFloatTitle')} · error` : `${t('watchFloatTitle')} · ${pending.length}`),
               h('button', { className: 'nc-btn', onClick: () => setOpen(false) }, t('watchClose'))),
-            error ? h('div', { className: 'nc-error' }, error) : h('div', { className: 'wf-list' }, rows),
+            h('div', { className: 'wf-tabs' },
+              h('button', { type: 'button', 'data-active': tab === 'pending', onClick: () => setTab('pending') }, `${t('watchPending')} ${pending.length}`),
+              h('button', { type: 'button', 'data-active': tab === 'suggest', onClick: () => setTab('suggest') }, `${t('watchSuggest')} ${suggestions.length}`)),
+            error ? h('div', { className: 'nc-error' }, error)
+              : tab === 'suggest'
+                ? h('div', { className: 'wf-list' }, suggestions.length ? suggestionRows : h('div', { className: 'wf-meta' }, t('watchNoSuggestions')))
+                : h('div', { className: 'wf-list' }, rows),
             h('div', { className: 'wf-foot' },
               busy ? h('span', { className: 'wf-meta', style: { marginRight: 'auto' } }, t('watchDigesting')) : null,
-              h('button', { className: 'nc-btn', disabled: busy || !pending.length, onClick: () => decide('accept', pending.map((item) => item.id)) }, t('watchAllAccept')),
-              h('button', { className: 'nc-btn', disabled: busy || !pending.length, onClick: () => decide('reject', pending.map((item) => item.id)) }, t('watchAllReject')))) : null,
+              tab === 'suggest'
+                ? h('button', { className: 'nc-btn', disabled: busy, onClick: refreshSuggestions }, t('watchRefresh'))
+                : h(React.Fragment, null,
+                  h('button', { className: 'nc-btn', disabled: busy || !pending.length, onClick: () => decide('accept', pending.map((item) => item.id)) }, t('watchAllAccept')),
+                  h('button', { className: 'nc-btn', disabled: busy || !pending.length, onClick: () => decide('reject', pending.map((item) => item.id)) }, t('watchAllReject'))))) : null,
           h('button', {
             className: 'wf-ball',
-            title: t('watchFloatTitle'),
+            title: pending.length ? t('watchFloatTitle') : t('watchSuggest'),
             'aria-label': t('watchFloatTitle'),
             style: {
               width: '54px', height: '54px', borderRadius: '27px',
@@ -388,8 +415,12 @@ window.__ModuleLoader__.load({
               fontSize: '14px', fontWeight: 700, cursor: 'pointer',
               boxShadow: '0 6px 18px rgba(0,0,0,.35)',
             },
-            onClick: () => setOpen(!open),
-          }, error ? '!' : data ? String(pending.length) : '…'));
+            onClick: () => {
+              const next = !open;
+              setOpen(next);
+              if (next && !pending.length) setTab('suggest');
+            },
+          }, error ? '!' : pending.length ? String(pending.length) : suggestions.length ? '荐' : '…'));
       };
     }
 

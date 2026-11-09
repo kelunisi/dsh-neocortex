@@ -60,6 +60,7 @@ export function buildQueue({ dataDir, date, picked, deepById }) {
       id: `${date}-${video.bvid}`,
       date,
       bvid: video.bvid,
+      mid: video.mid || 0,
       title: video.title,
       up: video.author || '',
       url: `https://www.bilibili.com/video/${video.bvid}`,

@@ -428,6 +428,7 @@ async def bili_search(keyword: str, num: int = 10, order: str = "totalrank", pag
         videos.append({
             "bvid": item.get("bvid", ""),
             "aid": item.get("aid", 0),
+            "mid": item.get("mid", 0),
             "title": title,
             "author": item.get("author", ""),
             "play": item.get("play", 0),
@@ -1038,8 +1039,60 @@ async def bili_user_info(uid: int) -> str:
     }, ensure_ascii=False)
 
 
-# ========== Tool 18: 用户视频列表 ==========
+@tool()
+async def bili_followings(page: int = 1, page_size: int = 50) -> str:
+    """
+    获取当前登录账号的关注列表（只读）
 
+    Args:
+        page: 第几页，从 1 开始（官方最多 5 页）
+        page_size: 每页数量，最大 50
+
+    Returns:
+        JSON: total / page / followings（mid、uname、sign、face、official）
+    """
+    cred = get_cred()
+    uid = int(getattr(cred, "dedeuserid", 0) or 0)
+    if not uid:
+        raise Exception("无法确定当前账号 UID，请重新调用 bili_login 登录")
+    u = user.User(uid=uid, credential=cred)
+    data = await u.get_followings(pn=max(1, int(page or 1)), ps=min(50, max(1, int(page_size or 50))))
+    followings = []
+    for entry in data.get("list", []) or []:
+        followings.append({
+            "mid": entry.get("mid", 0),
+            "uname": entry.get("uname", ""),
+            "sign": entry.get("sign", ""),
+            "face": entry.get("face", ""),
+            "official": entry.get("official_verify") or {},
+        })
+    return json.dumps({
+        "page": max(1, int(page or 1)),
+        "total": data.get("total", len(followings)),
+        "followings": followings,
+    }, ensure_ascii=False)
+
+
+@tool()
+async def bili_follow(uid: int, action: str = "follow") -> str:
+    """
+    关注 / 取关一个 UP 主（写操作，只应在用户明确批准后调用）
+
+    Args:
+        uid: 目标 UP 主 UID
+        action: follow=关注，unfollow=取关
+    """
+    _deny = _guard("bili_follow")
+    if _deny:
+        return _deny
+    cred = get_cred()
+    target = user.User(uid=int(uid), credential=cred)
+    relation = user.RelationType.SUBSCRIBE if action == "follow" else user.RelationType.UNSUBSCRIBE
+    data = await target.modify_relation(relation)
+    return json.dumps({"uid": int(uid), "action": action, "result": data}, ensure_ascii=False)
+
+
+# ========== Tool 18: 用户视频列表 ==========
 @tool()
 async def bili_user_videos(uid: int, pn: int = 1, ps: int = 30, order: str = "pubdate", keyword: str = "") -> str:
     """

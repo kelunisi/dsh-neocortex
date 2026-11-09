@@ -5,6 +5,8 @@ import { acceptItems, rejectItems } from './watch/ingest.js';
 import { hydrateItems } from './watch/hydrate.js';
 import { loadSchedulerState } from './watch/scheduler.js';
 import { loadBudget } from './watch/budget.js';
+import { buildSuggestions, fetchFollowings, loadSuggestions, saveSuggestions } from './watch/suggestions.js';
+import { loadCriteria } from './watch/criteria.js';
 
 function loadProtocol() {
   const localRequire = createRequire(import.meta.url);
@@ -58,6 +60,7 @@ export class NeocortexRemoteService extends TypertRemoteService {
       watchQueue: loadQueue(this.dataDir),
       watchScheduler: loadSchedulerState(this.dataDir),
       watchBudget: loadBudget(this.dataDir),
+      watchSuggestions: loadSuggestions(this.dataDir),
     });
   }
 
@@ -108,7 +111,26 @@ export class NeocortexRemoteService extends TypertRemoteService {
       queue: loadQueue(this.dataDir),
       scheduler: loadSchedulerState(this.dataDir),
       budget: loadBudget(this.dataDir),
+      suggestions: loadSuggestions(this.dataDir),
     });
+  }
+
+  async watchRefreshSuggestions() {
+    let followings = [];
+    let warning;
+    try {
+      followings = await fetchFollowings({
+        dataDir: this.dataDir,
+        config: this.config,
+        vendorDir: this.vendorDir,
+      });
+    } catch (error) {
+      warning = `关注列表读取失败：${String(error?.message || error).slice(0, 160)}`;
+    }
+    const { criteria } = loadCriteria(this.dataDir);
+    const items = buildSuggestions({ queue: loadQueue(this.dataDir), followings, criteria });
+    const saved = saveSuggestions(this.dataDir, { items });
+    return json({ ok: true, generatedAt: saved.generatedAt, items, count: items.length, followings: followings.length, warning });
   }
 
   previewReview(request) {
@@ -148,6 +170,6 @@ export class NeocortexRemoteService extends TypertRemoteService {
   }
 }
 
-for (const name of ['state', 'previewReview', 'confirmL1', 'undo', 'acceptReview', 'rejectReview', 'manualReview', 'retryReview', 'updateSettings', 'initializeBrain', 'updateWatch', 'watchOverview', 'watchDecide', 'updateWatchConfig']) {
+for (const name of ['state', 'previewReview', 'confirmL1', 'undo', 'acceptReview', 'rejectReview', 'manualReview', 'retryReview', 'updateSettings', 'initializeBrain', 'updateWatch', 'watchOverview', 'watchDecide', 'updateWatchConfig', 'watchRefreshSuggestions']) {
   remoteMethod(NeocortexRemoteService, name);
 }

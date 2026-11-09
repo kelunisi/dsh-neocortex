@@ -26,6 +26,7 @@ export const READ_ONLY_TOOLS = Object.freeze([
   'bili_rank',
   'bili_user_info',
   'bili_user_videos',
+  'bili_followings',
   'bili_favorite_lists',
   'bili_favorite_content',
   'bili_unread_messages',
@@ -38,6 +39,9 @@ export const READ_ONLY_TOOLS = Object.freeze([
   'bili_transcribe_start',
   'bili_transcribe_result',
 ]);
+
+/** 写操作单独开一组：只有用户明确批准关注时才把 bili_follow 放进白名单。 */
+export const FOLLOW_TOOLS = Object.freeze([...READ_ONLY_TOOLS, 'bili_follow']);
 
 export function defaultVendorDir() {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'vendor', 'bilibili-mcp');

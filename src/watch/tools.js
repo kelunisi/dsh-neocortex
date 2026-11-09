@@ -8,6 +8,8 @@ import { sanitize } from '../defaults.js';
 import { appendDecisions } from './calibration.js';
 import { hydrateItems } from './hydrate.js';
 import { acceptItems, rejectItems, retryItems } from './ingest.js';
+import { loadCriteria } from './criteria.js';
+import { buildSuggestions, fetchFollowings, saveSuggestions } from './suggestions.js';
 import { loginPoll, loginStart, qrDataUrl, renderQrPng, saveCredential } from './login.js';
 import { credentialFile, readCredential, resolvePython, venvPython } from './python.js';
 import { loadQueue, saveQueue } from './queue.js';
@@ -247,10 +249,52 @@ function createIngestTool(context) {
   };
 }
 
+function createSuggestTool(context) {
+  return {
+    name: 'watch_suggest',
+    description: '只读：读当前账号的关注列表，按判据给队列里的 UP 主打分，生成 3–5 个关注建议；不写关注。',
+    timeoutMs: 120000,
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: '最多返回几个建议，默认 5。' },
+      },
+      additionalProperties: false,
+    },
+    execute: async (args) => {
+      try {
+        let followings = [];
+        let warning;
+        try {
+          followings = await fetchFollowings({
+            dataDir: context.dataDir,
+            config: context.config,
+            vendorDir: context.vendorDir,
+            log: (line) => console.error('[watch]', line),
+          });
+        } catch (error) {
+          warning = `关注列表读取失败：${String(error?.message || error).slice(0, 160)}`;
+        }
+        const { criteria } = loadCriteria(context.dataDir);
+        const items = buildSuggestions({
+          queue: loadQueue(context.dataDir),
+          followings,
+          criteria,
+          limit: Math.max(1, Math.min(10, Number(args?.limit) || 5)),
+        });
+        saveSuggestions(context.dataDir, { items });
+        return sanitize({ ok: true, count: items.length, followings: followings.length, items, warning });
+      } catch (error) {
+        return sanitize({ ok: false, reason: 'suggest-failed', message: String(error?.message || error).slice(0, 300) });
+      }
+    },
+  };
+}
+
 export function registerWatchTools(ctx, { dataDir, config = {}, vendorDir = defaultVendorDir(), watch, writer } = {}) {
   if (!ctx?.tools?.register) return [];
   const context = { ctx, dataDir, config, vendorDir, watch, writer };
-  const tools = [createSelftestTool(context), createLoginTool(context), createRunTool(context), createFeedbackTool(context), createIngestTool(context)];
+  const tools = [createSelftestTool(context), createLoginTool(context), createRunTool(context), createFeedbackTool(context), createIngestTool(context), createSuggestTool(context)];
   for (const tool of tools) {
     try { ctx.tools.register(tool); } catch (error) { console.error('[dsh-neocortex] watch tool registration failed', error); }
   }

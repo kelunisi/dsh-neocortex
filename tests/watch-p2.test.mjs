@@ -106,6 +106,6 @@ test('P2-08 watch tools register selftest, login, run, feedback and ingest', () 
   const registered = [];
   const ctx = { tools: { register: (tool) => registered.push(tool.name) } };
   const names = registerWatchTools(ctx, { dataDir: tempDir(), config: {}, vendorDir });
-  assert.deepEqual(names, ['watch_selftest', 'watch_login', 'watch_run', 'watch_feedback', 'watch_ingest']);
-  assert.deepEqual(registered, ['watch_selftest', 'watch_login', 'watch_run', 'watch_feedback', 'watch_ingest']);
+  assert.deepEqual(names, ['watch_selftest', 'watch_login', 'watch_run', 'watch_feedback', 'watch_ingest', 'watch_suggest']);
+  assert.deepEqual(registered, ['watch_selftest', 'watch_login', 'watch_run', 'watch_feedback', 'watch_ingest', 'watch_suggest']);
 });

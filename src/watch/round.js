@@ -129,6 +129,7 @@ export async function runDryRound({
       totalCandidates: all.length,
       picked: picked.map((entry) => ({
         bvid: entry.video.bvid,
+        mid: entry.video.mid || 0,
         title: entry.video.title,
         up: entry.video.author,
         bucket: entry.bucket,
