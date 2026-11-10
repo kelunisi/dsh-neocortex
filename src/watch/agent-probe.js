@@ -12,6 +12,14 @@ function wait(ms) {
 export async function runAgentProbe({ ctx, dataDir, config = {} }) {
   const agents = ctx?.get?.('agents');
   if (!agents?.create) return { ok: false, reason: 'agents-service-missing' };
+  const presets = ctx.get?.('agentPresets');
+  let presetId = null;
+  if (presets?.resolve) {
+    try {
+      const preset = await presets.resolve('standard');
+      presetId = preset?.id || null;
+    } catch { presetId = null; }
+  }
   const route = ctx.get?.('agentDefaultModel')?.currentSelection?.() || {};
   let streamed = '';
   let setupInfo = {};
@@ -21,13 +29,17 @@ export async function runAgentProbe({ ctx, dataDir, config = {} }) {
     handle = await agents.create({
       sessionId,
       agentOptions: route.provider && route.model ? { provider: route.provider, model: route.model } : undefined,
-      meta: { cwd: dataDir, origin: 'subagent' },
-      setup: (agentCtx) => {
+      meta: { cwd: dataDir, agentPreset: presetId || undefined },
+      setup: async (agentCtx) => {
         setupInfo = {
           hasOn: typeof agentCtx?.on === 'function',
           hasTools: Boolean(agentCtx?.get?.('tools')),
           hasSystemPrompt: Boolean(agentCtx?.get?.('systemPrompt')),
+          presetId,
         };
+        if (presetId && typeof presets?.mount === 'function') {
+          await presets.mount(agentCtx, presetId);
+        }
         if (typeof agentCtx?.on === 'function') {
           agentCtx.on('agent/assistant-stream', ({ frame } = {}) => {
             if (frame?.type === 'chunk' && frame.chunk?.type === 'text-delta' && typeof frame.chunk.text === 'string') {
