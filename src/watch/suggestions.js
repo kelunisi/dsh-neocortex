@@ -42,6 +42,9 @@ export async function fetchFollowings({ dataDir, config = {}, vendorDir, pages =
     for (let page = 1; page <= pages; page += 1) {
       if (signal?.aborted) break;
       const result = await client.call('bili_followings', { page, page_size: 50 }, { timeoutMs: 60000, signal });
+      if (page === 1 && Number(result?.self_mid) > 0) {
+        Object.defineProperty(all, 'selfMid', { value: Number(result.self_mid), enumerable: false });
+      }
       const list = Array.isArray(result?.followings) ? result.followings : [];
       all.push(...list);
       if (list.length < 50) break;
@@ -86,8 +89,11 @@ export async function resolveUpMid({ uname, title, dataDir, config = {}, vendorD
   return 0;
 }
 
-export function buildSuggestions({ queue, followings = [], criteria, limit = 5 }) {  const followedMids = new Set(followings.map((entry) => String(entry.mid || '')).filter(Boolean));
-  const followedNames = new Set(followings.map((entry) => String(entry.uname || '').trim()).filter(Boolean));
+export function buildSuggestions({ queue, followings = [], criteria, limit = 5 }) {
+  const selfMid = Number(followings.selfMid || 0);
+  const peers = selfMid ? followings.filter((entry) => Number(entry.mid) !== selfMid) : followings;
+  const followedMids = new Set(peers.map((entry) => String(entry.mid || '')).filter(Boolean));
+  const followedNames = new Set(peers.map((entry) => String(entry.uname || '').trim()).filter(Boolean));
   const groups = new Map();
   for (const item of queue?.items || []) {
     if (!['accepted', 'pending', 'error'].includes(item.status)) continue;

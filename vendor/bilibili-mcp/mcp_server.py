@@ -1068,6 +1068,7 @@ async def bili_followings(page: int = 1, page_size: int = 50) -> str:
         })
     return json.dumps({
         "page": max(1, int(page or 1)),
+        "self_mid": uid,
         "total": data.get("total", len(followings)),
         "followings": followings,
     }, ensure_ascii=False)

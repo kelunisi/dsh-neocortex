@@ -68,7 +68,8 @@ export async function runDryRound({
     const followedUps = [];
     try {
       const followings = await fetchFollowings({ dataDir, config, vendorDir, signal, client, pages: 1 });
-      for (const up of followings.filter((entry) => Number(entry.mid) > 0).slice(0, 10)) {
+      const selfMid = Number(followings.selfMid || 0);
+      for (const up of followings.filter((entry) => Number(entry.mid) > 0 && Number(entry.mid) !== selfMid).slice(0, 10)) {
         followedUps.push(up);
         try {
           const result = await client.call('bili_user_videos', { uid: up.mid, pn: 1, ps: 5, order: 'pubdate' }, { timeoutMs: 45000, signal });
