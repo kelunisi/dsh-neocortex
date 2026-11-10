@@ -12,6 +12,8 @@ export function normalizeVideo(item) {
   return {
     bvid,
     aid: item.aid,
+    mid: Number(item.mid ?? 0),
+    following: item.following === true,
     title: String(item.title || '').trim(),
     author: String(item.author || item.up || '').trim(),
     play: Number(item.play ?? 0),
@@ -53,6 +55,8 @@ function playDesc(a, b) {
 export function pickCandidates(videos, criteria, { scanPerRound = 5, explorationRatio = 0.2, maxPerQuery = 2 } = {}) {
   const scored = dedupeVideos(videos).map((video) => {
     const triage = scoreCandidate(video, criteria);
+    // 已关注 UP 的候选：不改变相关性判断，但同分时优先，并保留一个名额。
+    if (video.following && !triage.excluded && triage.score > 0) triage.score += 6;
     return { video, triage };
   });
   const keyword = scored.filter((item) => !item.triage.excluded && item.triage.score > 0)
@@ -61,6 +65,10 @@ export function pickCandidates(videos, criteria, { scanPerRound = 5, exploration
   const exploration = scored.filter((item) => !item.triage.excluded && item.triage.score === 0
     && item.triage.utilityHits.length > 0)
     .sort((a, b) => b.triage.utilityHits.length - a.triage.utilityHits.length || b.triage.directionHits.length - a.triage.directionHits.length || playDesc(a.video, b.video) || pubdateDesc(a.video, b.video));
+  // 关注 UP 的候选单独一组，最多占 1 个名额；标题完全不相关的不硬塞。
+  const followed = scored.filter((item) => !item.triage.excluded && item.video.following
+    && (item.triage.score > 0 || item.triage.directionHits.length > 0))
+    .sort((a, b) => b.triage.score - a.triage.score || pubdateDesc(a.video, b.video));
 
   // 每个搜索词最多贡献 maxPerQuery 条，避免一个词（如"信息报送"）霸占全部名额。
   const take = (pool, slots) => {
@@ -77,18 +85,23 @@ export function pickCandidates(videos, criteria, { scanPerRound = 5, exploration
   };
 
   const explorationSlots = Math.min(scanPerRound, Math.max(1, Math.round(scanPerRound * explorationRatio)));
-  const keywordSlots = Math.max(0, scanPerRound - explorationSlots);
-  const picked = [
-    ...take(keyword, keywordSlots).map((item) => ({ ...item, bucket: 'keyword' })),
-    ...take(exploration, explorationSlots).map((item) => ({ ...item, bucket: 'exploration' })),
-  ];
-  // 一边不够就从另一边补，保证尽量凑满 scanPerRound（补位不再受 maxPerQuery 限制）。
-  for (const pool of [keyword, exploration]) {
-    for (const item of pool) {
-      if (picked.length >= scanPerRound) break;
+  const followedSlots = followed.length ? 1 : 0;
+  const keywordSlots = Math.max(0, scanPerRound - explorationSlots - followedSlots);
+  const picked = [];
+  const add = (items, bucket) => {
+    for (const item of items) {
+      if (picked.length >= scanPerRound) return;
       if (picked.some((entry) => entry.video.bvid === item.video.bvid)) continue;
-      picked.push({ ...item, bucket: pool === keyword ? 'keyword' : 'exploration' });
+      picked.push({ ...item, bucket });
     }
+  };
+  add(take(followed, followedSlots), 'following');
+  add(take(keyword, keywordSlots), 'keyword');
+  add(take(exploration, explorationSlots), 'exploration');
+  // 一边不够就从另一边补，保证尽量凑满 scanPerRound（补位不再受 maxPerQuery 限制）。
+  for (const [pool, bucket] of [[keyword, 'keyword'], [exploration, 'exploration'], [followed, 'following']]) {
+    add(pool, bucket);
+    if (picked.length >= scanPerRound) break;
   }
   return picked;
 }

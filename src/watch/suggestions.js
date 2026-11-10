@@ -34,8 +34,9 @@ export function saveSuggestions(dataDir, suggestions) {
   return { file, ...payload };
 }
 
-export async function fetchFollowings({ dataDir, config = {}, vendorDir, pages = 2, signal, log = () => {}, clientFactory = createBiliClient }) {
-  const { client } = clientFactory({ dataDir, config, vendorDir, log });
+export async function fetchFollowings({ dataDir, config = {}, vendorDir, pages = 2, signal, log = () => {}, clientFactory = createBiliClient, client: provided } = {}) {
+  const own = !provided;
+  const client = provided || clientFactory({ dataDir, config, vendorDir, log }).client;
   const all = [];
   try {
     for (let page = 1; page <= pages; page += 1) {
@@ -46,7 +47,9 @@ export async function fetchFollowings({ dataDir, config = {}, vendorDir, pages =
       if (list.length < 50) break;
     }
   } finally {
-    try { client.stop(); } catch { /* ignore */ }
+    if (own) {
+      try { client.stop(); } catch { /* ignore */ }
+    }
   }
   return all;
 }

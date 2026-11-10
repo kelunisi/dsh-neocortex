@@ -32,7 +32,7 @@ window.__ModuleLoader__.load({
       watchData: '状态文件', watchEnabled: '已开启', watchDisabled: '已关闭',
       watchPending: '待判', watchAccept: '收', watchReject: '扔', watchAllAccept: '全部收', watchAllReject: '全部扔',
       watchQueueEmpty: '队列为空，下一轮跑完会出现在这里。', watchBudget: '今日预算', watchUsed: '已用', watchRemaining: '剩余',
-      watchScan: '每轮扫几条', watchDeep: '每轮深读几条', watchToken: '日 token 预算',
+      watchScan: '每轮扫几条', watchDeep: '每轮深读几条', watchToken: '日 token 预算', watchMention: '每天最多评论 @',
       watchSchedule: '自动调度', watchLast: '上次结果', watchNext: '下次', watchNotScheduled: '未安排',
       watchFloatTitle: '今晚待判', watchClose: '收起', watchSaveWatch: '保存喂养参数', watchSavedWatch: '喂养参数已保存',
       watchDigesting: '补深读中…',
@@ -65,7 +65,7 @@ window.__ModuleLoader__.load({
       watchData: 'State file', watchEnabled: 'Enabled', watchDisabled: 'Disabled',
       watchPending: 'Pending', watchAccept: 'Keep', watchReject: 'Drop', watchAllAccept: 'Keep all', watchAllReject: 'Drop all',
       watchQueueEmpty: 'Queue is empty; the next round will fill it.', watchBudget: 'Today budget', watchUsed: 'Used', watchRemaining: 'Remaining',
-      watchScan: 'Scan per round', watchDeep: 'Deep reads per round', watchToken: 'Daily token budget',
+      watchScan: 'Scan per round', watchDeep: 'Deep reads per round', watchToken: 'Daily token budget', watchMention: 'Max comment @ per day',
       watchSchedule: 'Scheduler', watchLast: 'Last result', watchNext: 'Next', watchNotScheduled: 'Not scheduled',
       watchFloatTitle: 'Pending review', watchClose: 'Collapse', watchSaveWatch: 'Save feeding settings', watchSavedWatch: 'Feeding settings saved',
       watchDigesting: 'Reading subtitles…',
@@ -224,6 +224,7 @@ window.__ModuleLoader__.load({
           ['scanPerRound', t('watchScan')],
           ['deepPerRound', t('watchDeep')],
           ['tokenBudgetPerDay', t('watchToken')],
+          ['mentionPerDay', t('watchMention')],
         ];
         const watchSliders = sliderSpecs.map(([key, label]) => {
           const range = (watch.ranges && watch.ranges[key]) || (key === 'tokenBudgetPerDay' ? [100000, 5000000] : [1, 10]);

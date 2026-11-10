@@ -26,7 +26,7 @@ export const WATCH_DEFAULTS = Object.freeze({
 export const WATCH_RANGES = Object.freeze({
   scanPerRound: [1, 10],
   deepPerRound: [1, 5],
-  mentionPerDay: [0, 3],
+  mentionPerDay: [0, 10],
   dmPerDay: [0, 2],
   followingsPerRound: [1, 30],
   tokenBudgetPerDay: [100000, 5000000],

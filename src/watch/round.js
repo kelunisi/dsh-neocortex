@@ -7,6 +7,7 @@ import { loadCriteria, directionTokens } from './criteria.js';
 import { loadCalibration } from './calibration.js';
 import { buildQueue } from './queue.js';
 import { recordUsage } from './budget.js';
+import { fetchFollowings } from './suggestions.js';
 import { createBiliClient } from './bili.js';
 import { dedupeVideos, pickCandidates, selectDeep } from './triage.js';
 import { normalizeSubtitle, resolveModelRoute, understandVideo } from './understand.js';
@@ -63,6 +64,33 @@ export async function runDryRound({
   const { client } = clientFactory({ dataDir, config, vendorDir, log });
   try {
     const collected = [];
+    // 关注 UP 优先：先看他们最近 5 条，再让关键词搜索补满。
+    const followedUps = [];
+    try {
+      const followings = await fetchFollowings({ dataDir, config, vendorDir, signal, client, pages: 1 });
+      for (const up of followings.filter((entry) => Number(entry.mid) > 0).slice(0, 10)) {
+        followedUps.push(up);
+        try {
+          const result = await client.call('bili_user_videos', { uid: up.mid, pn: 1, ps: 5, order: 'pubdate' }, { timeoutMs: 45000, signal });
+          const videos = videosOf(result).map((video) => ({
+            ...video,
+            author: up.uname,
+            mid: up.mid,
+            following: true,
+            origin: 'following',
+            originQuery: `following:${up.mid}`,
+            duration: video.duration || video.length,
+            pubdate: video.pubdate || video.created,
+          }));
+          collected.push(...videos);
+          log(`关注「${up.uname}」：${videos.length} 条`);
+        } catch (error) {
+          log(`关注「${up.uname}」拉取失败：${String(error?.message || error)}`);
+        }
+      }
+    } catch (error) {
+      log(`关注列表读取失败，本轮退回纯关键词：${String(error?.message || error)}`);
+    }
     for (const keyword of queries) {
       if (signal?.aborted) throw new Error('已取消');
       const result = await client.call('bili_search', { keyword, num: 10, order: 'totalrank', page: 1 }, { timeoutMs: 45000, signal });
@@ -125,6 +153,7 @@ export async function runDryRound({
       route: modelRoute,
       queries,
       exploreQueries,
+      followedUps: followedUps.length,
       calibrationExamples: examples.length,
       totalCandidates: all.length,
       picked: picked.map((entry) => ({
