@@ -16,7 +16,7 @@ export async function runAgentProbe({ ctx, dataDir, config = {} }) {
   let presetId = null;
   if (presets?.resolve) {
     try {
-      const preset = await presets.resolve('standard');
+      const preset = await presets.resolve('minimal');
       presetId = preset?.id || null;
     } catch { presetId = null; }
   }
