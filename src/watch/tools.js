@@ -10,6 +10,7 @@ import { hydrateItems } from './hydrate.js';
 import { acceptItems, rejectItems, retryItems } from './ingest.js';
 import { loadCriteria } from './criteria.js';
 import { buildSuggestions, fetchFollowings, saveSuggestions } from './suggestions.js';
+import { runAgentProbe } from './agent-probe.js';
 import { loginPoll, loginStart, qrDataUrl, renderQrPng, saveCredential } from './login.js';
 import { credentialFile, readCredential, resolvePython, venvPython } from './python.js';
 import { loadQueue, saveQueue } from './queue.js';
@@ -291,10 +292,26 @@ function createSuggestTool(context) {
   };
 }
 
+function createAgentProbeTool(context) {
+  return {
+    name: 'watch_agent_probe',
+    description: 'P4.5 spike：尝试用宿主 agents.create 拉起一个临时会话，确认能否收集到模型文本；不改任何配置、不写知识库。',
+    timeoutMs: 90000,
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+    execute: async () => {
+      try {
+        return sanitize(await runAgentProbe({ ctx: context.ctx, dataDir: context.dataDir, config: context.config }));
+      } catch (error) {
+        return sanitize({ ok: false, reason: 'probe-crashed', message: String(error?.message || error).slice(0, 500) });
+      }
+    },
+  };
+}
+
 export function registerWatchTools(ctx, { dataDir, config = {}, vendorDir = defaultVendorDir(), watch, writer } = {}) {
   if (!ctx?.tools?.register) return [];
   const context = { ctx, dataDir, config, vendorDir, watch, writer };
-  const tools = [createSelftestTool(context), createLoginTool(context), createRunTool(context), createFeedbackTool(context), createIngestTool(context), createSuggestTool(context)];
+  const tools = [createSelftestTool(context), createLoginTool(context), createRunTool(context), createFeedbackTool(context), createIngestTool(context), createSuggestTool(context), createAgentProbeTool(context)];
   for (const tool of tools) {
     try { ctx.tools.register(tool); } catch (error) { console.error('[dsh-neocortex] watch tool registration failed', error); }
   }
