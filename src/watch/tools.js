@@ -110,14 +110,15 @@ function createLoginTool(context) {
 function createRunTool(context) {
   return {
     name: 'watch_run',
-    description: '手动跑一轮喂养（P3 离线试跑）：抓取 B 站候选、代码粗筛、深读 2–3 条、写日报与 JSONL；不写智脑、不发评论。需要先把开关切到 code 或 agent。',
+    description: '手动喂养：dry=跑一轮离线试跑；suggest=读关注列表生成关注建议；agent_probe=验证受限 agent 会话。dry/suggest 不写智脑，agent_probe 只建临时会话。',
     timeoutMs: 900000,
     parameters: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['dry'], description: 'P3 只支持 dry（离线试跑）。' },
+        action: { type: 'string', enum: ['dry', 'suggest', 'agent_probe'], description: 'dry 跑一轮；suggest 生成关注建议；agent_probe 验证 agent 会话。' },
         queries: { type: 'array', items: { type: 'string' }, description: '可选：覆盖判据里的搜索词。' },
         deep: { type: 'integer', minimum: 1, maximum: 5, description: '可选：深读条数，默认 3。' },
+        limit: { type: 'integer', minimum: 1, maximum: 10, description: 'suggest 时最多返回几条，默认 5。' },
       },
       additionalProperties: false,
     },
@@ -127,6 +128,27 @@ function createRunTool(context) {
     },
     execute: async (args, exec) => {
       try {
+        if (args?.action === 'agent_probe') {
+          return sanitize(await runAgentProbe({ ctx: context.ctx, dataDir: context.dataDir, config: context.config }));
+        }
+        if (args?.action === 'suggest') {
+          let followings = [];
+          let warning;
+          try {
+            followings = await fetchFollowings({ dataDir: context.dataDir, config: context.config, vendorDir: context.vendorDir, log: (line) => console.error('[watch]', line) });
+          } catch (error) {
+            warning = `关注列表读取失败：${String(error?.message || error).slice(0, 160)}`;
+          }
+          const { criteria } = loadCriteria(context.dataDir);
+          const items = buildSuggestions({
+            queue: loadQueue(context.dataDir),
+            followings,
+            criteria,
+            limit: Math.max(1, Math.min(10, Number(args?.limit) || 5)),
+          });
+          saveSuggestions(context.dataDir, { items });
+          return sanitize({ ok: true, action: 'suggest', count: items.length, followings: followings.length, items, warning });
+        }
         if (!context.watch?.enabled?.()) return sanitize({ ok: false, reason: 'mode-off', message: '喂养开关是 off；先在面板切到 code 模式。' });
         const result = await runDryRound({
           ctx: context.ctx,
@@ -311,7 +333,7 @@ function createAgentProbeTool(context) {
 export function registerWatchTools(ctx, { dataDir, config = {}, vendorDir = defaultVendorDir(), watch, writer } = {}) {
   if (!ctx?.tools?.register) return [];
   const context = { ctx, dataDir, config, vendorDir, watch, writer };
-  const tools = [createSelftestTool(context), createLoginTool(context), createRunTool(context), createFeedbackTool(context), createIngestTool(context), createSuggestTool(context), createAgentProbeTool(context)];
+  const tools = [createSelftestTool(context), createLoginTool(context), createRunTool(context), createFeedbackTool(context), createIngestTool(context)];
   for (const tool of tools) {
     try { ctx.tools.register(tool); } catch (error) { console.error('[dsh-neocortex] watch tool registration failed', error); }
   }
