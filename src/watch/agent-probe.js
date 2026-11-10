@@ -21,6 +21,8 @@ export async function runAgentProbe({ ctx, dataDir, config = {} }) {
     } catch { presetId = null; }
   }
   const route = ctx.get?.('agentDefaultModel')?.currentSelection?.() || {};
+  let parentAgent;
+  try { parentAgent = ctx.get?.('agents')?.currentInitiator?.() || undefined; } catch { parentAgent = undefined; }
   let streamed = '';
   let setupInfo = {};
   let handle;
@@ -28,8 +30,9 @@ export async function runAgentProbe({ ctx, dataDir, config = {} }) {
   try {
     handle = await agents.create({
       sessionId,
+      parentAgent,
       agentOptions: route.provider && route.model ? { provider: route.provider, model: route.model } : undefined,
-      meta: { cwd: dataDir, agentPreset: presetId || undefined },
+      meta: { cwd: dataDir, agentPreset: presetId || undefined, ...(parentAgent ? { origin: 'subagent', delegationDepth: 1 } : {}) },
       setup: async (agentCtx) => {
         setupInfo = {
           hasOn: typeof agentCtx?.on === 'function',
@@ -68,6 +71,7 @@ export async function runAgentProbe({ ctx, dataDir, config = {} }) {
       sessionId,
       keys: Object.keys(handle.agent || {}),
       setup: setupInfo,
+      parentAgent: Boolean(parentAgent),
       idle,
       streamed: streamed.slice(0, 500),
       messageCount: messages.length,
