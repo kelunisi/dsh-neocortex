@@ -51,8 +51,39 @@ export async function fetchFollowings({ dataDir, config = {}, vendorDir, pages =
   return all;
 }
 
-export function buildSuggestions({ queue, followings = [], criteria, limit = 5 }) {
-  const followedMids = new Set(followings.map((entry) => String(entry.mid || '')).filter(Boolean));
+export function removeSuggestion(dataDir, { mid, up }) {
+  const current = loadSuggestions(dataDir);
+  const keyMid = Number(mid) || 0;
+  const name = String(up || '').trim();
+  const items = current.items.filter((entry) => {
+    if (keyMid && Number(entry.mid) === keyMid) return false;
+    if (!keyMid && name && entry.up === name) return false;
+    return true;
+  });
+  saveSuggestions(dataDir, { items });
+  return items;
+}
+
+export async function resolveUpMid({ uname, title, dataDir, config = {}, vendorDir, signal, clientFactory = createBiliClient }) {
+  const name = String(uname || '').trim();
+  const titleKey = String(title || '').trim().slice(0, 20);
+  if (!name && !titleKey) return 0;
+  const { client } = clientFactory({ dataDir, config, vendorDir });
+  try {
+    for (const keyword of [name, titleKey].filter(Boolean)) {
+      const result = await client.call('bili_search', { keyword, num: 20 }, { timeoutMs: 60000, signal });
+      const videos = Array.isArray(result?.videos) ? result.videos : [];
+      const match = videos.find((video) => Number(video.mid) > 0
+        && (video.author === name || (titleKey && String(video.title || '').includes(titleKey))));
+      if (match) return Number(match.mid);
+    }
+  } finally {
+    try { client.stop(); } catch { /* ignore */ }
+  }
+  return 0;
+}
+
+export function buildSuggestions({ queue, followings = [], criteria, limit = 5 }) {  const followedMids = new Set(followings.map((entry) => String(entry.mid || '')).filter(Boolean));
   const followedNames = new Set(followings.map((entry) => String(entry.uname || '').trim()).filter(Boolean));
   const groups = new Map();
   for (const item of queue?.items || []) {

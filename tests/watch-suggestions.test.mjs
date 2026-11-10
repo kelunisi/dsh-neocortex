@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSuggestions } from '../src/watch/suggestions.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { buildSuggestions, removeSuggestion, resolveUpMid } from '../src/watch/suggestions.js';
 
 const criteria = { must: ['显卡', '金价', '信息报送'], plus: [], exclude: [], directions: [] };
 
@@ -46,4 +49,38 @@ test('S7-03 limit is respected', () => {
     ],
   };
   assert.equal(buildSuggestions({ queue, followings: [], criteria, limit: 2 }).length, 2);
+});
+
+test('S7-04 resolve a missing UP UID through a title search', async () => {
+  const mid = await resolveUpMid({
+    uname: '惊叹号diy电脑',
+    title: 'A卡降价',
+    dataDir: os.tmpdir(),
+    config: {},
+    vendorDir: 'unused',
+    clientFactory: () => ({
+      client: {
+        async call(name, args) {
+          assert.equal(name, 'bili_search');
+          assert.equal(args.keyword, '惊叹号diy电脑');
+          return { videos: [{ mid: 65401107, author: '惊叹号diy电脑', title: 'A卡降价' }] };
+        },
+        stop() {},
+      },
+    }),
+  });
+  assert.equal(mid, 65401107);
+});
+
+test('S7-05 removing a suggestion drops it from the saved file', () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'neocortex-suggest-'));
+  fs.mkdirSync(path.join(dataDir, 'watch'), { recursive: true });
+  fs.writeFileSync(path.join(dataDir, 'watch', 'suggestions.json'), JSON.stringify({
+    generatedAt: '2026-11-10T00:00:00Z',
+    items: [{ mid: 1, up: 'A' }, { mid: 2, up: 'B' }],
+  }), 'utf8');
+  const left = removeSuggestion(dataDir, { mid: 2, up: 'B' });
+  assert.deepEqual(left.map((entry) => entry.up), ['A']);
+  const saved = JSON.parse(fs.readFileSync(path.join(dataDir, 'watch', 'suggestions.json'), 'utf8'));
+  assert.equal(saved.items.length, 1);
 });

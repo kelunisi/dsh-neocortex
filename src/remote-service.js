@@ -5,7 +5,8 @@ import { acceptItems, rejectItems } from './watch/ingest.js';
 import { hydrateItems } from './watch/hydrate.js';
 import { loadSchedulerState } from './watch/scheduler.js';
 import { loadBudget } from './watch/budget.js';
-import { buildSuggestions, fetchFollowings, loadSuggestions, saveSuggestions } from './watch/suggestions.js';
+import { buildSuggestions, fetchFollowings, loadSuggestions, removeSuggestion, resolveUpMid, saveSuggestions } from './watch/suggestions.js';
+import { createBiliClient, FOLLOW_TOOLS } from './watch/bili.js';
 import { loadCriteria } from './watch/criteria.js';
 
 function loadProtocol() {
@@ -133,6 +134,34 @@ export class NeocortexRemoteService extends TypertRemoteService {
     return json({ ok: true, generatedAt: saved.generatedAt, items, count: items.length, followings: followings.length, warning });
   }
 
+  async watchFollow(request) {
+    if (!this.writer) return json({ ok: false, reason: 'writer-unavailable' });
+    const up = String(request?.up || '').trim();
+    let mid = Number(request?.mid) || 0;
+    if (!mid) {
+      mid = await resolveUpMid({
+        uname: up,
+        title: request?.bvid ? '' : request?.title,
+        dataDir: this.dataDir,
+        config: this.config,
+        vendorDir: this.vendorDir,
+      });
+    }
+    if (!mid) return json({ ok: false, reason: 'no-mid', message: `没找到「${up || '这个 UP'}」的 UID，等下一轮有了 mid 再关注` });
+    const { client } = createBiliClient({ dataDir: this.dataDir, config: this.config, vendorDir: this.vendorDir, tools: FOLLOW_TOOLS });
+    try {
+      const result = await client.call('bili_follow', { uid: mid, action: 'follow' }, { timeoutMs: 60000 });
+      const code = Number(result?.result?.code ?? result?.code ?? 0);
+      if (code !== 0) throw new Error(`B站返回 ${code}: ${result?.result?.message || result?.message || ''}`);
+      const remaining = removeSuggestion(this.dataDir, { mid, up });
+      return json({ ok: true, mid, up, action: 'follow', remaining: remaining.length });
+    } catch (error) {
+      return json({ ok: false, reason: 'follow-failed', message: String(error?.message || error).slice(0, 200) });
+    } finally {
+      try { client.stop(); } catch { /* ignore */ }
+    }
+  }
+
   previewReview(request) {
     return json(this.panel.review.preview(request.id));
   }
@@ -170,6 +199,6 @@ export class NeocortexRemoteService extends TypertRemoteService {
   }
 }
 
-for (const name of ['state', 'previewReview', 'confirmL1', 'undo', 'acceptReview', 'rejectReview', 'manualReview', 'retryReview', 'updateSettings', 'initializeBrain', 'updateWatch', 'watchOverview', 'watchDecide', 'updateWatchConfig', 'watchRefreshSuggestions']) {
+for (const name of ['state', 'previewReview', 'confirmL1', 'undo', 'acceptReview', 'rejectReview', 'manualReview', 'retryReview', 'updateSettings', 'initializeBrain', 'updateWatch', 'watchOverview', 'watchDecide', 'updateWatchConfig', 'watchRefreshSuggestions', 'watchFollow']) {
   remoteMethod(NeocortexRemoteService, name);
 }

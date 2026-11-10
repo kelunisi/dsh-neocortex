@@ -37,6 +37,7 @@ window.__ModuleLoader__.load({
       watchFloatTitle: '今晚待判', watchClose: '收起', watchSaveWatch: '保存喂养参数', watchSavedWatch: '喂养参数已保存',
       watchDigesting: '补深读中…',
       watchSuggest: '关注建议', watchRefresh: '刷新建议', watchNoSuggestions: '还没有建议，点“刷新建议”生成。',
+      watchFollow: '关注', watchFollowed: '已关注',
     };
     const en = {
       tab: 'Neocortex', title: 'Neocortex Memory', subtitle: 'Markdown is authoritative; the ledger explains recall and lifecycle.',
@@ -69,6 +70,7 @@ window.__ModuleLoader__.load({
       watchFloatTitle: 'Pending review', watchClose: 'Collapse', watchSaveWatch: 'Save feeding settings', watchSavedWatch: 'Feeding settings saved',
       watchDigesting: 'Reading subtitles…',
       watchSuggest: 'Follow ideas', watchRefresh: 'Refresh ideas', watchNoSuggestions: 'No ideas yet; tap Refresh ideas.',
+      watchFollow: 'Follow', watchFollowed: 'Followed',
     };
 
     const jsonCodec = {
@@ -82,7 +84,7 @@ window.__ModuleLoader__.load({
       state: false, previewReview: true, confirmL1: true, undo: true,
       acceptReview: true, rejectReview: true, manualReview: false, retryReview: false,
       updateSettings: true, initializeBrain: true, updateWatch: true,
-      watchOverview: false, watchDecide: true, updateWatchConfig: true, watchRefreshSuggestions: false,
+      watchOverview: false, watchDecide: true, updateWatchConfig: true, watchRefreshSuggestions: false, watchFollow: true,
     };
     const TYPERT_REMOTE = {
       package: 'dsh-neocortex',
@@ -336,6 +338,7 @@ window.__ModuleLoader__.load({
         const [open, setOpen] = useState(false);
         const [busy, setBusy] = useState(false);
         const [tab, setTab] = useState('pending');
+        const [note, setNote] = useState('');
         const refresh = async () => {
           try {
             // 用面板同一个 state 接口，避免新增 remote 方法在旧客户端里不可用。
@@ -375,6 +378,20 @@ window.__ModuleLoader__.load({
           catch { /* keep the old list */ }
           finally { setBusy(false); }
         };
+        const follow = async (entry) => {
+          setBusy(true);
+          setNote('');
+          try {
+            const result = await call('watchFollow', { mid: entry.mid, up: entry.up, bvid: entry.examples?.[0]?.bvid });
+            if (result && result.ok === false) throw new Error(result.message || result.reason || 'follow-failed');
+            setNote(`${t('watchFollowed')} ${entry.up}`);
+            await refresh();
+          } catch (cause) {
+            setNote(String(cause?.message || cause));
+          } finally {
+            setBusy(false);
+          }
+        };
         const rows = pending.map((item) => h('div', { className: 'wf-item', key: item.id },
           h('div', { className: 'wf-title' }, item.title),
           h('div', { className: 'wf-meta' }, `${item.up || ''} · ${item.duration || ''} · ${item.bvid}`),
@@ -385,7 +402,9 @@ window.__ModuleLoader__.load({
         const suggestionRows = suggestions.map((entry) => h('div', { className: 'wf-item', key: entry.mid || entry.up },
           h('div', { className: 'wf-title' }, entry.up),
           h('div', { className: 'wf-meta' }, entry.reason),
-          entry.examples?.[0] ? h('div', { className: 'wf-meta' }, `例：《${entry.examples[0].title}》`) : null));
+          entry.examples?.[0] ? h('div', { className: 'wf-meta' }, `例：《${entry.examples[0].title}》`) : null,
+          h('div', { className: 'nc-actions' },
+            h('button', { className: 'nc-btn', disabled: busy, onClick: () => follow(entry) }, t('watchFollow')))));
         return h('div', { className: 'wf-root' },
           open ? h('div', { className: 'wf-panel' },
             h('div', { className: 'wf-head' },
@@ -399,7 +418,7 @@ window.__ModuleLoader__.load({
                 ? h('div', { className: 'wf-list' }, suggestions.length ? suggestionRows : h('div', { className: 'wf-meta' }, t('watchNoSuggestions')))
                 : h('div', { className: 'wf-list' }, rows),
             h('div', { className: 'wf-foot' },
-              busy ? h('span', { className: 'wf-meta', style: { marginRight: 'auto' } }, t('watchDigesting')) : null,
+              note ? h('span', { className: 'wf-meta', style: { marginRight: 'auto' } }, note) : busy ? h('span', { className: 'wf-meta', style: { marginRight: 'auto' } }, t('watchDigesting')) : null,
               tab === 'suggest'
                 ? h('button', { className: 'nc-btn', disabled: busy, onClick: refreshSuggestions }, t('watchRefresh'))
                 : h(React.Fragment, null,
