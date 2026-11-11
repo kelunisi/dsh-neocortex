@@ -10,7 +10,6 @@ import { hydrateItems } from './hydrate.js';
 import { acceptItems, rejectItems, retryItems } from './ingest.js';
 import { loadCriteria } from './criteria.js';
 import { buildSuggestions, fetchFollowings, saveSuggestions } from './suggestions.js';
-import { runAgentProbe } from './agent-probe.js';
 import { loginPoll, loginStart, qrDataUrl, renderQrPng, saveCredential } from './login.js';
 import { credentialFile, readCredential, resolvePython, venvPython } from './python.js';
 import { loadQueue, saveQueue } from './queue.js';
@@ -110,16 +109,14 @@ function createLoginTool(context) {
 function createRunTool(context) {
   return {
     name: 'watch_run',
-    description: '手动喂养：dry=跑一轮离线试跑；suggest=读关注列表生成关注建议；agent_probe=验证受限 agent 会话。dry/suggest 不写智脑，agent_probe 只建临时会话。',
+    description: '手动喂养：dry=跑一轮离线试跑；suggest=读关注列表生成关注建议。两者都不写智脑、不发送内容。',
     timeoutMs: 900000,
     parameters: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['dry', 'suggest', 'agent_probe'], description: 'dry 跑一轮；suggest 生成关注建议；agent_probe 验证 agent 会话。' },
+        action: { type: 'string', enum: ['dry', 'suggest'], description: 'dry 跑一轮；suggest 生成关注建议。' },
         queries: { type: 'array', items: { type: 'string' }, description: '可选：覆盖判据里的搜索词。' },
         deep: { type: 'integer', minimum: 1, maximum: 5, description: '可选：深读条数，默认 3。' },
-        provider: { type: 'string', description: 'agent_probe 可选：与 model 一起指定临时路由，不修改部署默认值。' },
-        model: { type: 'string', description: 'agent_probe 可选：与 provider 一起指定临时路由。' },
         limit: { type: 'integer', minimum: 1, maximum: 10, description: 'suggest 时最多返回几条，默认 5。' },
       },
       additionalProperties: false,
@@ -130,13 +127,6 @@ function createRunTool(context) {
     },
     execute: async (args, exec) => {
       try {
-        if (args?.action === 'agent_probe') {
-          const config = {
-            ...context.config,
-            ...(args?.provider && args?.model ? { provider: args.provider, model: args.model } : {}),
-          };
-          return sanitize(await runAgentProbe({ ctx: context.ctx, dataDir: context.dataDir, config, signal: exec?.signal }));
-        }
         if (args?.action === 'suggest') {
           let followings = [];
           let warning;
@@ -275,64 +265,6 @@ function createIngestTool(context) {
         return sanitize({ ok: true, decision: 'reject', ...result, remaining, queueFile: queue.file });
       } catch (error) {
         return sanitize({ ok: false, reason: 'ingest-failed', message: String(error?.message || error) });
-      }
-    },
-  };
-}
-
-function createSuggestTool(context) {
-  return {
-    name: 'watch_suggest',
-    description: '只读：读当前账号的关注列表，按判据给队列里的 UP 主打分，生成 3–5 个关注建议；不写关注。',
-    timeoutMs: 120000,
-    parameters: {
-      type: 'object',
-      properties: {
-        limit: { type: 'number', description: '最多返回几个建议，默认 5。' },
-      },
-      additionalProperties: false,
-    },
-    execute: async (args) => {
-      try {
-        let followings = [];
-        let warning;
-        try {
-          followings = await fetchFollowings({
-            dataDir: context.dataDir,
-            config: context.config,
-            vendorDir: context.vendorDir,
-            log: (line) => console.error('[watch]', line),
-          });
-        } catch (error) {
-          warning = `关注列表读取失败：${String(error?.message || error).slice(0, 160)}`;
-        }
-        const { criteria } = loadCriteria(context.dataDir);
-        const items = buildSuggestions({
-          queue: loadQueue(context.dataDir),
-          followings,
-          criteria,
-          limit: Math.max(1, Math.min(10, Number(args?.limit) || 5)),
-        });
-        saveSuggestions(context.dataDir, { items });
-        return sanitize({ ok: true, count: items.length, followings: followings.length, items, warning });
-      } catch (error) {
-        return sanitize({ ok: false, reason: 'suggest-failed', message: String(error?.message || error).slice(0, 300) });
-      }
-    },
-  };
-}
-
-function createAgentProbeTool(context) {
-  return {
-    name: 'watch_agent_probe',
-    description: 'P4.5 spike：尝试用宿主 agents.create 拉起一个临时会话，确认能否收集到模型文本；不改任何配置、不写知识库。',
-    timeoutMs: 90000,
-    parameters: { type: 'object', properties: {}, additionalProperties: false },
-    execute: async () => {
-      try {
-        return sanitize(await runAgentProbe({ ctx: context.ctx, dataDir: context.dataDir, config: context.config }));
-      } catch (error) {
-        return sanitize({ ok: false, reason: 'probe-crashed', message: String(error?.message || error).slice(0, 500) });
       }
     },
   };

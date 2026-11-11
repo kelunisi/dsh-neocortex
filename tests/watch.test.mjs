@@ -22,8 +22,8 @@ test('WATCH-01 a fresh data dir starts off and creates nothing at construction',
   const state = watch.state();
   assert.equal(state.phase, 'P1');
   assert.equal(state.mode, 'off');
-  assert.deepEqual(state.modes, ['off', 'code', 'agent']);
-  assert.deepEqual(state.capabilities, { scheduler: false, harvest: false, interaction: false, agentMode: 'ready' });
+  assert.deepEqual(state.modes, ['off', 'code']);
+  assert.deepEqual(state.capabilities, { scheduler: false, harvest: false, interaction: false });
 });
 
 test('WATCH-02 switching mode persists atomically and a restart reads it back', () => {
@@ -49,11 +49,12 @@ test('WATCH-02 switching mode persists atomically and a restart reads it back', 
 test('WATCH-03 an unknown mode is rejected without touching the file or memory', () => {
   const dataDir = tempDir();
   const watch = new WatchService({ dataDir, now });
-  watch.setMode('agent');
+  assert.throws(() => watch.setMode('agent'), /Invalid watch mode/);
+  watch.setMode('code');
   const file = path.join(dataDir, 'watch.json');
   const before = fs.readFileSync(file, 'utf8');
   assert.throws(() => watch.setMode('always'), /Invalid watch mode/);
-  assert.equal(watch.mode, 'agent');
+  assert.equal(watch.mode, 'code');
   assert.equal(fs.readFileSync(file, 'utf8'), before);
 });
 
@@ -110,7 +111,7 @@ test('WATCH-07 mountWatch wires disposal once and starts nothing while off', () 
 test('WATCH-08 panel state is lossless JSON', () => {
   const dataDir = tempDir();
   const watch = new WatchService({ dataDir, now });
-  watch.setMode('agent');
+  watch.setMode('code');
   const cloned = JSON.parse(JSON.stringify(watch.state()));
   assert.deepEqual(cloned, watch.state());
 });
@@ -121,4 +122,10 @@ test('WATCH-09 normalizeWatchConfig drops unknown keys and keeps defaults', () =
   assert.equal('mystery' in config, false);
   assert.equal(config.mode, 'code');
   assert.equal(config.followingsPerRound, WATCH_DEFAULTS.followingsPerRound);
+});
+
+test('WATCH-10 an old agent mode migrates to code instead of blocking the plugin', () => {
+  const { config, repaired } = normalizeWatchConfig({ mode: 'agent', schema: 1 });
+  assert.equal(config.mode, 'code');
+  assert.deepEqual(repaired, ['mode:agent->code']);
 });

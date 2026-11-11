@@ -9,7 +9,7 @@ export const WATCH_PHASE = 'P1';
 
 export const WATCH_SCHEMA = 1;
 
-export const WATCH_MODES = Object.freeze(['off', 'code', 'agent']);
+export const WATCH_MODES = Object.freeze(['off', 'code']);
 
 export const WATCH_DEFAULTS = Object.freeze({
   mode: 'off',
@@ -35,7 +35,6 @@ export const WATCH_RANGES = Object.freeze({
 const MODE_LABELS = Object.freeze({
   off: '关闭',
   code: '代码模式',
-  agent: 'Agent 模式',
 });
 
 export function isWatchMode(value) {
@@ -64,7 +63,11 @@ export function normalizeWatchConfig(raw) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   const config = { ...WATCH_DEFAULTS };
   if (source.mode !== undefined) {
-    if (isWatchMode(source.mode)) config.mode = source.mode;
+    if (source.mode === 'agent') {
+      // agent 模式已放弃：旧的 agent 配置平滑回落到 code，不阻断插件加载。
+      config.mode = 'code';
+      repaired.push('mode:agent->code');
+    } else if (isWatchMode(source.mode)) config.mode = source.mode;
     else repaired.push(`mode:${String(source.mode)}`);
   }
   for (const [key, range] of Object.entries(WATCH_RANGES)) {

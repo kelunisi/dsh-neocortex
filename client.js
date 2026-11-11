@@ -23,10 +23,9 @@ window.__ModuleLoader__.load({
       setupNew: '新建智脑', setupTakeover: '使用已有智脑', setupUpgrade: '升级补齐骨架', setupDirPlaceholder: '目录路径，留空用默认',
       setupStart: '执行', setupDoneNew: '新建完成', setupDoneTakeover: '接管完成', setupDoneUpgrade: '补齐完成', setupRestart: '重启插件后生效',
       watchTab: '喂养', watchTitle: '喂养模块', watchPhase: '自动跑 + 收/扔 + 预算；面板与悬浮球为 P7',
-      watchCurrent: '当前模式', watchOff: '关闭', watchCode: '代码模式', watchAgent: 'Agent 模式',
+      watchCurrent: '当前模式', watchOff: '关闭', watchCode: '代码模式',
       watchOffDesc: '一键停：不起进程、不花 token、历史数据不动。',
       watchCodeDesc: '代码跑腿，模型只判断（推荐）。',
-      watchAgentDesc: '只读受限会话自主抓取和判读；失败时明确标记并降级代码模式。',
       watchSaved: '喂养开关已保存。', watchQueue: '待确认卡片',
       watchEmptyQueue: '还没有待确认卡片——P1 阶段不抓取内容。',
       watchData: '状态文件', watchEnabled: '已开启', watchDisabled: '已关闭',
@@ -56,10 +55,9 @@ window.__ModuleLoader__.load({
       setupNew: 'Create new brain', setupTakeover: 'Use existing brain', setupUpgrade: 'Upgrade skeleton', setupDirPlaceholder: 'Directory path; blank uses default',
       setupStart: 'Run', setupDoneNew: 'Created', setupDoneTakeover: 'Taken over', setupDoneUpgrade: 'Upgraded', setupRestart: 'Restart the plugin to take effect',
       watchTab: 'Feeding', watchTitle: 'Feeding module', watchPhase: 'Automatic rounds, accept/drop and budgets; the floating panel is P7.',
-      watchCurrent: 'Current mode', watchOff: 'Off', watchCode: 'Code', watchAgent: 'Agent',
+      watchCurrent: 'Current mode', watchOff: 'Off', watchCode: 'Code',
       watchOffDesc: 'Stop everything: no process, no tokens, history untouched.',
       watchCodeDesc: 'Code does the legwork; the model only judges (recommended).',
-      watchAgentDesc: 'A read-only restricted session fetches and judges; failures are marked and fall back to Code.',
       watchSaved: 'Feeding switch saved.', watchQueue: 'Pending cards',
       watchEmptyQueue: 'No pending cards yet — P1 does not harvest anything.',
       watchData: 'State file', watchEnabled: 'Enabled', watchDisabled: 'Disabled',
@@ -207,12 +205,12 @@ window.__ModuleLoader__.load({
                 }
               }) }, t('setupStart'))))) : null;
 
-        const watch = state.watch || { mode: 'off', enabled: false, file: '', modes: ['off', 'code', 'agent'], config: {}, ranges: {} };
+        const watch = state.watch || { mode: 'off', enabled: false, file: '', modes: ['off', 'code'], config: {}, ranges: {} };
         const modeButton = (mode, label) => h(Button, {
           primary: watch.mode === mode, disabled: busy,
           onClick: safely(async () => { await act('updateWatch', { mode }); setMessage(t('watchSaved')); }),
         }, label);
-        const modeDescription = watch.mode === 'off' ? t('watchOffDesc') : watch.mode === 'code' ? t('watchCodeDesc') : t('watchAgentDesc');
+        const modeDescription = watch.mode === 'off' ? t('watchOffDesc') : t('watchCodeDesc');
         const pendingQueue = (state.watchQueue?.items || []).filter((item) => item.status === 'pending');
         const watchBudget = state.watchBudget || { used: 0 };
         const scheduler = state.watchScheduler || {};
@@ -253,7 +251,7 @@ window.__ModuleLoader__.load({
               h('div', { className: 'nc-card-head' },
                 h('div', null, h('b', null, `${t('watchCurrent')}: ${watch.mode}`)),
                 h('span', null, watch.enabled ? t('watchEnabled') : t('watchDisabled'))),
-              h('div', { className: 'nc-actions' }, modeButton('off', t('watchOff')), modeButton('code', t('watchCode')), modeButton('agent', t('watchAgent'))),
+              h('div', { className: 'nc-actions' }, modeButton('off', t('watchOff')), modeButton('code', t('watchCode'))),
               h('p', { className: 'nc-note' }, modeDescription),
               h('div', { className: 'nc-meta nc-path' }, `${t('watchData')}: ${watch.file || '—'}`))),
           h(Section, { title: `${t('watchQueue')}（${pendingQueue.length}）` }, queueView),

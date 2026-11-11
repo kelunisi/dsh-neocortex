@@ -48,12 +48,12 @@ You can also steer it in natural language: "skip the brain this time" (no read/w
 
 v0.5 adds a `src/watch/` feeding module to the same plugin, off by default.
 
-- **Settings → Plugins → Zhinao → Feeding** switches between `off / code / agent`; the state is persisted to `<dataDir>/watch.json`.
+- **Settings → Plugins → Zhinao → Feeding** switches between `off / code`; the state is persisted to `<dataDir>/watch.json`.
 - `off` is inert: no process, no tokens, no harvesting, no files.
 - `watch_selftest` (`action: "install"`) creates the venv, installs the Bilibili MCP requirements, then checks Python / script / deps / login / ffmpeg. `watch_login` runs QR login and stores the credential with current-user-only permissions.
-- Both modes produce the same daily Markdown report, JSONL records and pending-confirmation queue. Accepting queue items is separate from harvesting; no comments, DMs or follows are sent by a round.
-- `code` uses deterministic harvesting and model judgement. `agent` mounts `watch-duty`, clears every inherited tool with `tools.restrict({ allow: [] })`, then exposes only four bounded read-only Bilibili tools. Candidate and subtitle evidence is verified in code; failures are visibly marked before any allowed fallback to `code`.
-- `watch_run` supports `dry`, `suggest` and the strict `agent_probe` diagnostic. The probe requires a completed turn, the expected reply and zero visible tools.
+- The code mode produces the daily Markdown report, JSONL records and pending-confirmation queue. Accepting queue items is separate from harvesting; no comments, DMs or follows are sent by a round.
+- `code` uses deterministic harvesting and model judgement. An experimental restricted-agent implementation remains in the repository but is **not exposed** in the panel; the product decision is `off / code` only.
+- `watch_run` supports `dry` and `suggest` (read-only follow suggestions).
 
 ## Uninstall
 
