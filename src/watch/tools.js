@@ -10,6 +10,8 @@ import { hydrateItems } from './hydrate.js';
 import { acceptItems, rejectItems, retryItems } from './ingest.js';
 import { loadCriteria } from './criteria.js';
 import { buildSuggestions, fetchFollowings, saveSuggestions } from './suggestions.js';
+import { fetchAcceptedComments, saveCommentReport } from './comments.js';
+import { localDay } from './scheduler.js';
 import { loginPoll, loginStart, qrDataUrl, renderQrPng, saveCredential } from './login.js';
 import { credentialFile, readCredential, resolvePython, venvPython } from './python.js';
 import { loadQueue, saveQueue } from './queue.js';
@@ -109,15 +111,16 @@ function createLoginTool(context) {
 function createRunTool(context) {
   return {
     name: 'watch_run',
-    description: '手动喂养：dry=跑一轮离线试跑；suggest=读关注列表生成关注建议。两者都不写智脑、不发送内容。',
+    description: '手动喂养：dry=跑一轮离线试跑；suggest=读关注列表生成关注建议；comments=从已收视频评论区淘评论。均不写智脑、不发送内容。',
     timeoutMs: 900000,
     parameters: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['dry', 'suggest'], description: 'dry 跑一轮；suggest 生成关注建议。' },
+        action: { type: 'string', enum: ['dry', 'suggest', 'comments'], description: 'dry 跑一轮；suggest 生成关注建议；comments 淘已收视频的评论。' },
         queries: { type: 'array', items: { type: 'string' }, description: '可选：覆盖判据里的搜索词。' },
         deep: { type: 'integer', minimum: 1, maximum: 5, description: '可选：深读条数，默认 3。' },
-        limit: { type: 'integer', minimum: 1, maximum: 10, description: 'suggest 时最多返回几条，默认 5。' },
+        limit: { type: 'integer', minimum: 1, maximum: 10, description: 'suggest 时最多返回几条；comments 时最多入选几条评论。' },
+        maxVideos: { type: 'integer', minimum: 1, maximum: 10, description: 'comments 时最多看几个已收视频，默认 3。' },
       },
       additionalProperties: false,
     },
@@ -145,7 +148,21 @@ function createRunTool(context) {
           saveSuggestions(context.dataDir, { items });
           return sanitize({ ok: true, action: 'suggest', count: items.length, followings: followings.length, items, warning });
         }
-        if (!context.watch?.enabled?.()) return sanitize({ ok: false, reason: 'mode-off', message: '喂养开关是 off；先在面板切到 code 或 agent 模式。' });
+        if (args?.action === 'comments') {
+          const { videos, comments } = await fetchAcceptedComments({
+            queue: loadQueue(context.dataDir),
+            dataDir: context.dataDir,
+            config: context.config,
+            vendorDir: context.vendorDir,
+            maxVideos: Math.max(1, Math.min(10, Number(args?.maxVideos) || 3)),
+            maxItems: Math.max(1, Math.min(10, Number(args?.limit) || 15)),
+            signal: exec?.signal,
+            log: (line) => console.error('[watch]', line),
+          });
+          const saved = saveCommentReport({ dataDir: context.dataDir, date: localDay(new Date()), videos, comments });
+          return sanitize({ ok: true, action: 'comments', file: saved.file, videos: videos.length, comments: comments.length, items: comments });
+        }
+        if (!context.watch?.enabled?.()) return sanitize({ ok: false, reason: 'mode-off', message: '喂养开关是 off；先在面板切到代码模式。' });
         const result = await runWatchRound({
           mode: context.watch?.mode,
           ctx: context.ctx,
