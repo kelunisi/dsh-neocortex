@@ -2,19 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runAgentProbe } from '../src/watch/agent-probe.js';
 
-function fakeHost({ turnKind = 'completed', failure = null, reply = '收到' } = {}) {
-  const calls = { restrictions: [], mounts: [], creates: [] };
+function fakeHost({ turnKind = 'completed', failure = null, reply = '收到', requestTools = [] } = {}) {
+  const calls = { restrictions: [], mounts: [], creates: [], descriptors: [] };
   let streamListener;
+  const events = [];
+  const session = {
+    deriveMessages: () => [{ role: 'assistant', content: [{ type: 'text', text: reply }] }],
+    snapshotEvents: () => [...events, { type: 'turn/end', data: { reason: { kind: turnKind, ...(failure ? { error: failure } : {}) } } }],
+    append(type, data) {
+      if (type === 'subagent/descriptor') calls.descriptors.push(data);
+      events.push({ type, data });
+    },
+  };
   const handle = {
     agent: {
       followup() {
+        session.append('request/header', { header: { tools: requestTools.map((name) => ({ name })) } });
         streamListener?.({ frame: { type: 'chunk', chunk: { type: 'text-delta', text: reply } } });
       },
       async whenIdle() {},
-      session: {
-        deriveMessages: () => [{ role: 'assistant', content: [{ type: 'text', text: reply }] }],
-        snapshotEvents: () => [{ type: 'turn/end', data: { reason: { kind: turnKind, ...(failure ? { error: failure } : {}) } } }],
-      },
+      session,
     },
     async dispose() { calls.disposed = true; },
   };
@@ -30,7 +37,7 @@ function fakeHost({ turnKind = 'completed', failure = null, reply = '收到' } =
         tools,
         get: (name) => ({ tools, systemPrompt: {} })[name],
         on: (name, listener) => { if (name === 'agent/assistant-stream') streamListener = listener; },
-      }, { id: 'child' });
+      }, handle.agent);
       return handle;
     },
   };
@@ -55,6 +62,11 @@ test('AGENT-PROBE-01 watch-duty probe requires completed turn and zero visible t
   assert.equal(result.setup.presetId, 'watch-duty');
   assert.equal(result.setup.restricted, true);
   assert.deepEqual(result.setup.toolNames, []);
+  assert.deepEqual(result.requestToolNames, []);
+  assert.equal(result.requestHeaderCount, 1);
+  assert.deepEqual(calls.descriptors, [{ version: 3, mode: 'one-shot', provider: 'dsh-neocortex', label: 'watch-duty' }]);
+  assert.equal(calls.creates[0].meta.origin, 'subagent');
+  assert.equal(calls.creates[0].meta.parentSession, 'parent');
   assert.deepEqual(calls.restrictions, [{ allow: [] }]);
   assert.deepEqual(calls.mounts, ['watch-duty']);
   assert.equal(result.parentAgent, true);
@@ -98,4 +110,14 @@ test('AGENT-PROBE-05 a broken preset fails before creating a model session', asy
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'preset-broken');
   assert.equal(calls.creates.length, 0);
+});
+
+test('AGENT-PROBE-06 late team tools in the real request fail a previously clean setup', async () => {
+  const { ctx, calls } = fakeHost({ requestTools: ['spawn_teammate', 'send_message'] });
+  const result = await runAgentProbe({ ctx, dataDir: 'unused' });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'probe-tool-leak');
+  assert.deepEqual(result.requestToolNames, ['send_message', 'spawn_teammate']);
+  assert.deepEqual(result.setup.toolNames, []);
+  assert.equal(calls.disposed, true);
 });

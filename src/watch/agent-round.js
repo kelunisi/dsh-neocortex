@@ -12,6 +12,7 @@ import { loadCriteria, scoreCandidate } from './criteria.js';
 import { buildQueue } from './queue.js';
 import { localDay, writeRoundReport } from './report.js';
 import { buildExploreQueries } from './round.js';
+import { markWatchSubagent, requestHeaderTools } from './session.js';
 import { normalizeVideo } from './triage.js';
 import {
   MAX_SUBTITLE_CHARS,
@@ -24,6 +25,9 @@ import {
 export const WATCH_AGENT_PRESET = 'watch-duty';
 
 const MAX_TOOL_CALLS = 30;
+const WATCH_AGENT_TOOLS = Object.freeze([
+  'watch_bili_followings', 'watch_bili_search', 'watch_bili_user_videos', 'watch_bili_subtitle',
+]);
 const SEARCH_TIMEOUT_MS = 45000;
 const SUBTITLE_TIMEOUT_MS = 60000;
 
@@ -533,15 +537,20 @@ export async function runAgentRound({
         model: modelRoute.model,
         ...(modelRoute.reasoningEffort === undefined ? {} : { reasoningEffort: modelRoute.reasoningEffort }),
       },
-      meta: { cwd: dataDir, agentPreset: WATCH_AGENT_PRESET },
+      meta: {
+        cwd: dataDir,
+        agentPreset: WATCH_AGENT_PRESET,
+        origin: 'subagent',
+        ...(parentAgent?.id ? { parentSession: parentAgent.id } : {}),
+      },
       setup: async (agentCtx, agent) => {
         await presets.mount(agentCtx, WATCH_AGENT_PRESET);
+        markWatchSubagent(agent);
         // allow:[] intentionally denies every inherited/global tool. Scoped registrations below survive.
         agentCtx.tools.restrict({ allow: [] });
-        const expectedTools = ['watch_bili_followings', 'watch_bili_search', 'watch_bili_user_videos', 'watch_bili_subtitle'];
         for (const tool of createScopedTools({ client, signal, toolCalls, subtitles, candidates })) agentCtx.tools.register(tool);
         const visibleTools = agentCtx.tools.schemas?.(agent)?.map?.((tool) => tool.name).sort() || [];
-        if (JSON.stringify(visibleTools) !== JSON.stringify([...expectedTools].sort())) {
+        if (JSON.stringify(visibleTools) !== JSON.stringify([...WATCH_AGENT_TOOLS].sort())) {
           throw codedError('AGENT_TOOL_POLICY', `agent 实际工具面不符合只读契约：${visibleTools.join(', ') || '(无法读取)'}`);
         }
         agentCtx.on?.('agent/assistant-stream', ({ frame } = {}) => {
@@ -562,6 +571,17 @@ export async function runAgentRound({
     const failure = turnFailure(handle.agent);
     if (failure) throw failure;
     throwIfAborted(signal);
+    const requestHeaders = requestHeaderTools(handle.agent);
+    const requestToolNames = [...new Set(requestHeaders.flatMap((header) => header.tools))].sort();
+    const expectedTools = [...WATCH_AGENT_TOOLS].sort();
+    const exactRequestTools = requestHeaders.length > 0 && requestHeaders.every((header) => (
+      JSON.stringify([...header.tools].sort()) === JSON.stringify(expectedTools)
+    ));
+    if (!exactRequestTools) {
+      const error = codedError('AGENT_TOOL_LEAK', `模型请求出现非契约工具：${requestToolNames.join(', ') || '(无 request/header)'}`);
+      error.nonFallback = true;
+      throw error;
+    }
 
     const finalText = finalAssistantText(handle.agent, streamedText);
     const payload = extractJudgement(finalText);
@@ -613,6 +633,8 @@ export async function runAgentRound({
       route: modelRoute,
       mode: 'agent',
       sessionId,
+      requestToolNames,
+      requestHeaderCount: requestHeaders.length,
       toolCalls,
       toolCallCount: toolCalls.length,
       queries,

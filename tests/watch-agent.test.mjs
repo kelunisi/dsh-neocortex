@@ -106,6 +106,7 @@ function makeHost({ reply = '{"items":[]}', events, usageEvents = [], onFollowup
     disposed: false,
     toolResults: {},
     cancellations: [],
+    descriptors: [],
     reply,
   };
   const registry = new Map();
@@ -128,6 +129,10 @@ function makeHost({ reply = '{"items":[]}', events, usageEvents = [], onFollowup
     events: [],
     deriveMessages: () => session.messages,
     snapshotEvents: () => session.events,
+    append(type, data) {
+      if (type === 'subagent/descriptor') state.descriptors.push(data);
+      session.events.push({ type, data, seq: session.events.length });
+    },
   };
   const agent = {
     session,
@@ -137,10 +142,11 @@ function makeHost({ reply = '{"items":[]}', events, usageEvents = [], onFollowup
       const text = typeof state.reply === 'function' ? state.reply(state) : state.reply;
       if (derive) session.messages = [{ role: 'assistant', content: [{ type: 'text', text }] }];
       else streamListener?.({ frame: { type: 'chunk', chunk: { type: 'text-delta', text } } });
-      session.events = [
+      session.append('request/header', { header: { tools: tools.schemas() } });
+      session.events.push(
         ...usageEvents,
         ...(events || [{ type: 'turn/end', data: { reason: { kind: 'completed' } } }]),
-      ];
+      );
     },
     whenIdle: whenIdle || (async () => {}),
     cancel(cause) { state.cancellations.push(cause); onCancel?.(cause); },
@@ -233,6 +239,10 @@ test('WATCH-AGENT-01 setup clears inherited tools and registers exactly four bou
     },
   });
   assert.equal(WATCH_AGENT_PRESET, 'watch-duty');
+  assert.deepEqual(host.state.descriptors, [{ version: 3, mode: 'one-shot', provider: 'dsh-neocortex', label: 'watch-duty' }]);
+  assert.equal(host.state.creates[0].meta.origin, 'subagent');
+  assert.equal(host.state.creates[0].meta.parentSession, 'parent-agent');
+  assert.deepEqual(result.requestToolNames, [...host.state.registered].sort());
   assert.deepEqual(host.state.restrictions, [{ allow: [] }]);
   assert.deepEqual(host.state.registered, ['watch_bili_followings', 'watch_bili_search', 'watch_bili_user_videos', 'watch_bili_subtitle']);
   assert.equal(host.state.order[0], 'mount:watch-duty');
@@ -259,7 +269,7 @@ test('WATCH-AGENT-01 setup clears inherited tools and registers exactly four bou
     assert.equal(tool.output.render(null, { ok: true })[0].text, '{"ok":true}');
   }
   assert.equal(host.state.creates[0].meta.agentPreset, 'watch-duty');
-  assert.equal(host.state.creates[0].meta.origin, undefined);
+  assert.equal(host.state.creates[0].meta.origin, 'subagent');
   assert.equal(host.state.creates[0].meta.delegationDepth, undefined);
   assert.deepEqual(host.state.creates[0].agentOptions, { provider: 'fake-provider', model: 'fake-model', reasoningEffort: 'low' });
   assert.equal(result.toolCallCount, 4);
@@ -536,7 +546,7 @@ test('WATCH-AGENT-14 artifact I/O errors are commit failures, not fallback-safe 
   }), (error) => error.code === 'WATCH_COMMIT_FAILED');
 });
 
-test('WATCH-AGENT-15 scheduled parentless rounds do not forge subagent metadata', async () => {
+test('WATCH-AGENT-15 scheduled parentless rounds keep a truthful descriptor without a runtime parent', async () => {
   const { result, host } = await runWithFakes({
     hostOptions: {
       parent: false,
@@ -545,7 +555,8 @@ test('WATCH-AGENT-15 scheduled parentless rounds do not forge subagent metadata'
   });
   assert.equal(result.ok, true);
   assert.equal(host.state.creates[0].parentAgent, undefined);
-  assert.equal(host.state.creates[0].meta.origin, undefined);
+  assert.equal(host.state.creates[0].meta.origin, 'subagent');
+  assert.equal(host.state.creates[0].meta.parentSession, undefined);
   assert.equal(host.state.creates[0].meta.delegationDepth, undefined);
 });
 
@@ -561,4 +572,20 @@ test('WATCH-AGENT-16 max-tokens is incomplete even when final JSON happens to pa
     ctx: host.ctx, dataDir, route: ROUTE, now: NOW, clientFactory: () => ({ client: fake.client }),
   }), (error) => error.code === 'max-tokens');
   assertNoRoundArtifacts(dataDir);
+});
+
+test('WATCH-AGENT-17 late Host team-tool injection fails the real request contract', async () => {
+  const dataDir = prepareData();
+  const host = makeHost({
+    onFollowup: async () => { registryLeak(); },
+  });
+  function registryLeak() {
+    host.registry.set('spawn_teammate', { name: 'spawn_teammate' });
+  }
+  const fake = makeClient();
+  await assert.rejects(runAgentRound({
+    ctx: host.ctx, dataDir, route: ROUTE, now: NOW, clientFactory: () => ({ client: fake.client }),
+  }), (error) => error.code === 'AGENT_TOOL_LEAK' && error.nonFallback === true);
+  assertNoRoundArtifacts(dataDir);
+  assert.equal(host.state.disposed, true);
 });

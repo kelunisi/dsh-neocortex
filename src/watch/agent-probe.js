@@ -5,6 +5,7 @@
 
 import crypto from 'node:crypto';
 import { WATCH_AGENT_PRESET } from './agent-round.js';
+import { markWatchSubagent, requestHeaderTools } from './session.js';
 
 function wait(ms) {
   return new Promise((resolve) => {
@@ -49,7 +50,12 @@ export async function runAgentProbe({ ctx, dataDir, config = {}, signal }) {
       parentAgent,
       signal,
       agentOptions: route.provider && route.model ? { provider: route.provider, model: route.model } : undefined,
-      meta: { cwd: dataDir, agentPreset: presetId || undefined },
+      meta: {
+        cwd: dataDir,
+        agentPreset: presetId || undefined,
+        origin: 'subagent',
+        ...(parentAgent?.id ? { parentSession: parentAgent.id } : {}),
+      },
       setup: async (agentCtx, agent) => {
         setupInfo = {
           hasOn: typeof agentCtx?.on === 'function',
@@ -60,6 +66,7 @@ export async function runAgentProbe({ ctx, dataDir, config = {}, signal }) {
         if (presetId && typeof presets?.mount === 'function') {
           await presets.mount(agentCtx, presetId);
         }
+        markWatchSubagent(agent);
         if (typeof agentCtx?.tools?.restrict !== 'function') {
           throw new Error('当前宿主缺少 agent scoped tools.restrict()，无法保证只读工具面');
         }
@@ -103,15 +110,20 @@ export async function runAgentProbe({ ctx, dataDir, config = {}, signal }) {
     const lastTurn = [...events].reverse().find((event) => event?.type === 'turn/end');
     const turnKind = lastTurn?.data?.reason?.kind || null;
     const turnFailure = lastTurn?.data?.reason?.error || lastTurn?.data?.reason?.failure || null;
+    const requestHeaders = requestHeaderTools(handle.agent);
+    const requestToolNames = [...new Set(requestHeaders.flatMap((header) => header.tools))].sort();
+    const exactZeroRequestTools = requestHeaders.length > 0 && requestHeaders.every((header) => header.tools.length === 0);
     const ok = idle && !timedOut && !aborted && presetId === WATCH_AGENT_PRESET && setupInfo.restricted === true
-      && setupInfo.toolNames?.length === 0 && streamed.trim() === '收到'
+      && setupInfo.toolNames?.length === 0 && exactZeroRequestTools && streamed.trim() === '收到'
       && turnKind === 'completed';
     return {
       ok,
-      ...(ok ? {} : { reason: timedOut ? 'probe-timeout' : aborted ? 'probe-aborted' : turnFailure ? 'probe-turn-error' : 'probe-contract-failed' }),
+      ...(ok ? {} : { reason: timedOut ? 'probe-timeout' : aborted ? 'probe-aborted' : turnFailure ? 'probe-turn-error' : !exactZeroRequestTools ? 'probe-tool-leak' : 'probe-contract-failed' }),
       sessionId,
       keys: Object.keys(handle.agent || {}),
       setup: setupInfo,
+      requestToolNames,
+      requestHeaderCount: requestHeaders.length,
       parentAgent: Boolean(parentAgent),
       idle,
       streamed: streamed.slice(0, 500),
