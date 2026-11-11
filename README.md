@@ -46,14 +46,14 @@ You can also steer it in natural language: "skip the brain this time" (no read/w
 
 ## Feeding module (v0.5, in development)
 
-v0.5 adds a `src/watch/` feeding module to the same plugin, off by default. Current progress: P1 skeleton + P2 data layer.
+v0.5 adds a `src/watch/` feeding module to the same plugin, off by default.
 
 - **Settings → Plugins → Zhinao → Feeding** switches between `off / code / agent`; the state is persisted to `<dataDir>/watch.json`.
 - `off` is inert: no process, no tokens, no harvesting, no files.
-- From P2 on, two tools configure the runtime:
-  - `watch_selftest` (`action: "install"`) creates the venv, installs the Bilibili MCP requirements, then checks Python / script / deps / login / ffmpeg.
-  - `watch_login` (`action: "start"` / `"poll"`) runs QR login; the credential lands in `<dataDir>/watch/bili-mcp/bili_credential.json` with current-user-only permissions.
-- Harvest, triage, the pending queue, comments/DMs and the privacy gate arrive from P3 on. The `agent` mode waits for preset assembly validation; see [`docs/p0-agent-mode.md`](docs/p0-agent-mode.md).
+- `watch_selftest` (`action: "install"`) creates the venv, installs the Bilibili MCP requirements, then checks Python / script / deps / login / ffmpeg. `watch_login` runs QR login and stores the credential with current-user-only permissions.
+- Both modes produce the same daily Markdown report, JSONL records and pending-confirmation queue. Accepting queue items is separate from harvesting; no comments, DMs or follows are sent by a round.
+- `code` uses deterministic harvesting and model judgement. `agent` mounts `watch-duty`, clears every inherited tool with `tools.restrict({ allow: [] })`, then exposes only four bounded read-only Bilibili tools. Candidate and subtitle evidence is verified in code; failures are visibly marked before any allowed fallback to `code`.
+- `watch_run` supports `dry`, `suggest` and the strict `agent_probe` diagnostic. The probe requires a completed turn, the expected reply and zero visible tools.
 
 ## Uninstall
 

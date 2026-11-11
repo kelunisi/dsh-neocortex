@@ -16,6 +16,7 @@ import { loadSettings, PanelStateService } from './src/panel-service.js';
 import { NeocortexRemoteService } from './src/remote-service.js';
 import { executePanelTool, isPanelReadAction } from './src/panel-tool.js';
 import { mountWatch } from './src/watch/index.js';
+import { isWatchAgentSession } from './src/watch/session.js';
 
 export const inject = ['agents', 'sessions', 'tools', 'systemPrompt'];
 
@@ -99,6 +100,8 @@ export function apply(ctx, rawConfig = {}) {
 
   const attached = new Set();
   const attach = (agent) => {
+    // 喂养 agent 只接收 Host 显式传入的判据/候选，不读取个人记忆。
+    if (isWatchAgentSession(agent)) return;
     if (attached.has(agent.id)) return;
     attached.add(agent.id);
     const dispose = agent.ctx.on('agent/pre-step', (payload, next) => runtime.preStep(agent, payload, next));
@@ -113,7 +116,7 @@ export function apply(ctx, rawConfig = {}) {
   ctx.systemPrompt.section({
     name: 'dsh-neocortex-memory',
     order: 60,
-    text: '智脑记忆：有后续召回价值时使用 neocortex_remember，普通聊天不要保存。个人往事注入未命中时使用 neocortex_recall；查知识库用 neocortex_recall 并设 scope="knowledge"；若返回 web_search 则改用网络检索。用户说“这次不用智脑”时不读写，说“这个不要记”时不保存指定内容。不得保存密码、凭据或无必要的敏感信息。面板状态、撤销、周回顾和参数使用 neocortex_panel；L1 确认与候选接受/拒绝不得代用户执行。',
+    text: ({ scope } = {}) => isWatchAgentSession(scope) ? '' : '智脑记忆：有后续召回价值时使用 neocortex_remember，普通聊天不要保存。个人往事注入未命中时使用 neocortex_recall；查知识库用 neocortex_recall 并设 scope="knowledge"；若返回 web_search 则改用网络检索。用户说“这次不用智脑”时不读写，说“这个不要记”时不保存指定内容。不得保存密码、凭据或无必要的敏感信息。面板状态、撤销、周回顾和参数使用 neocortex_panel；L1 确认与候选接受/拒绝不得代用户执行。',
   });
 
   ctx.tools.register({

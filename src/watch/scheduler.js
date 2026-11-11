@@ -164,7 +164,16 @@ export class WatchScheduler {
       .then((result) => {
         state.lastRunDay = day;
         state.lastRunAt = new Date().toISOString();
-        state.lastResult = { kind: 'ran', day, ok: result?.ok !== false, summary: result?.summary || null, at: new Date().toISOString() };
+        state.lastResult = {
+          kind: 'ran',
+          day,
+          ok: result?.ok !== false,
+          mode: result?.mode || watch.mode,
+          requestedMode: result?.requestedMode,
+          degraded: result?.degraded,
+          summary: result?.summary || null,
+          at: new Date().toISOString(),
+        };
         saveSchedulerState(this.dataDir, state);
       })
       .catch((error) => {

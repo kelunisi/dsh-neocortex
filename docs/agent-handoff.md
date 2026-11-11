@@ -1,127 +1,45 @@
-# P4.5 `agent` 档交接文档（未跑通）
+# Watch agent 档交接（2026-11-11）
 
-> 日期：2026-11-10 21:55 · 状态：**agent 档未接通；code 档全部正常**  
-> 接手对象：另一个 AI 或后续维护者。请先读“结论”和“已试路径”，再看“证据与复现”。
+## 当前结论
 
-## 一句话结论
+- 旧 `minimal` 探针已在 `kimi-code-cn/k3.1-pro` 成功回复“收到”，`turn/end=completed`。它只证明手工 `agents.create` 能获得模型文本，**不是只读或完整 agent 跑轮验收**。
+- 该旧请求的 `request/header.tools` 实际包含 83 个宿主工具（PowerShell、watch_ingest、watch_login、neocortex_remember 等），所以旧探针不满足安全边界。
+- 正式 `watch-duty`、真实 agent 跑轮、统一分流和显式降级已实现，离线全量 **139/139**、语法检查 **42 个 JS 文件**通过。
+- 运行中的 Host 仍使用旧模块。修改已经加载的 Cordis 插件源码后，禁用/启用不会重新 import；**必须完整退出并重开 DSH Host**，才能做新代码的真实验收。
+- 旧 `deepseek-account/deepseek-flash` 的 TRANSPORT 是否已修复仍未知；新探针支持临时指定该路由复测，不改部署默认。
 
-`ctx.agents.create()` 能成功建出受限会话，preset 也能挂上（standard/minimal 都试过），`parentAgent` 也传了，但**每一次模型请求都在 provider 层以 `DeepSeek Messages transport failed`（`TRANSPORT`）失败**，重试 5 次后 `turn/end: error`。
+## 已实现
 
-同一台机器、同一个 `deepseek-account / deepseek-flash` 路由下，**普通 subagent 工具能正常回复**，所以不是账号凭证或模型不可用；问题限定在“手工 `agents.create` 出来的会话如何拿到可用的模型传输”。
+1. `cordis.patch.yml` 声明 `preset-watch-duty`，只挂 persona，不把 preset 当沙箱。
+2. `src/watch/agent-round.js`：
+   - setup 先 mount `watch-duty`，再 `tools.restrict({allow:[]})` 清空继承工具；
+   - 仅注册 `watch_bili_followings`、`watch_bili_search`、`watch_bili_user_videos`、`watch_bili_subtitle`，并用 `schemas(agent)` 验证恰好四个；
+   - 最多 30 次工具调用，搜索/关注/字幕参数与输出有界；
+   - 最终 BV 和元数据必须来自本轮实际候选工具结果；deep 必须有同 BV 的实际非空字幕；
+   - 无字幕/低置信度接受转待定，排除已判定/排除词，执行 scan/deep 限额；
+   - 非 completed（包括 error、aborted、max-tokens）失败；超时/外部取消调用 `agent.cancel()`，finally dispose 并停 MCP；
+   - 复用日报、JSONL、queue、预算产物；usage 优先真实 provider usage，失败轮次记录实测部分用量。
+3. `src/watch/runner.js` 统一手动与定时分流。创建/模型/解析失败可带 `degraded` 降级 code；取消、预算耗尽、`WATCH_COMMIT_FAILED` 不重跑。降级前再次检查预算。
+4. `src/watch/agent-probe.js` 只有同时满足 watch-duty、零可见工具、回复“收到”、turn completed 才 `ok:true`；支持临时 provider/model。
+5. `index.js` 跳过 `watch-agent-*` / `watch-probe-*` 的个人记忆 pre-step，并不给这些会话显示记忆操作指令。
+6. 没有给 agent 文件、shell、关注、评论、私信、记忆写入或入库工具；没有新增第 6 个全局 watch 工具。
 
-## 已确认正常的部分
+## 证据
 
-- 插件 `dsh-neocortex@0.5.0-dev.0`，profile 用 `link:` 指到 `E:\AI-workspace\DSH sp\智脑项目区\dsh-neocortex`。
-- `code` 档：搜索、深读、判读、队列、L2/L3 入库、悬浮球、关注建议、关注写操作、调度器、预算，全部可用。
-- 全量测试 **110/110**。
-- 普通 subagent（工具 `subagent`）在同 profile 下能正常回复；对照会话 `296a3beb-9370-4367-a84a-c677a1ff509e`，请求头是：
-  `provider=deepseek-account, model=deepseek-flash, maxTokens=256000`，有正常 `assistant/message`。
-- 探针 `watch_run action=agent_probe` 能创建会话：
-  - 返回 `ok:true`、`keys` 含 `session/ctx/dispatch` 等；
-  - `setup.hasOn/hasTools/hasSystemPrompt` 都是 true；
-  - 会话里能写 `system/message`、多条 `user/message`、`request/header`、`request/context`。
+- 旧成功探针：`E:\AI-workspace\.dsh\sessions\--E-AI-workspace-DSH~0020sp-dsh-neocortex-.data--\watch-probe-1794400848778-52390d\session.v4.jsonl.zstd`。
+- 核心测试：`tests/watch-agent.test.mjs`（16 项）、`watch-agent-probe.test.mjs`、`watch-dispatcher.test.mjs`、`watch-session.test.mjs`。
+- 执行：
+  ```powershell
+  & 'C:\Users\kelunisi\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe' --test tests/*.test.mjs
+  & 'C:\Users\kelunisi\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe' scripts/check.mjs
+  ```
 
-## 已试路径（全部失败在同一处）
+## 重启后的验收顺序
 
-| # | 装配 | 会话 ID | 结果 |
-|---|---|---|---|
-| 1 | 无 preset、无 parentAgent | `watch-probe-1794313662184-cf6f70` | 5 条消息，`assistant/attempt` 全部 TRANSPORT |
-| 2 | `standard` preset、无 parentAgent | `watch-probe-1794315032085-283da1` | 8 条消息，同样 TRANSPORT |
-| 3 | `standard` preset + `parentAgent` | `watch-probe-1794317913348-038b43` | `parentAgent:true`，同样 TRANSPORT |
-| 4 | `minimal` preset + `parentAgent` | `watch-probe-1794318777588-94285e` | `presetId:minimal`、`parentAgent:true`，同样 TRANSPORT |
-
-共同错误序列（每个会话都相同）：
-
-```text
-assistant/attempt → finish { kind:'error', failure:{ message:'DeepSeek Messages transport failed', code:'TRANSPORT' } }
-llm/retry ×5（policy 允许 EMPTY_RESPONSE/RATE_LIMIT/SERVER/TIMEOUT/TRANSPORT）
-turn/end → error
-```
-
-## 关键证据位置
-
-会话日志（zstd 多帧 JSONL）：
-
-```text
-E:\AI-workspace\.dsh\sessions\--E-AI-workspace-DSH~0020sp-dsh-neocortex-.data--\<sessionId>\session.v4.jsonl.zstd
-```
-
-解压方法：文件是多个 zstd frame 拼接；按 magic `28 B5 2F FD` 切帧，逐帧 `zstdDecompressSync`。  
-工作区 `sandbox/read-probe3.mjs` 是本次用的脚本，可直接改 session 路径复用。
-
-对照成功会话：
-
-```text
-E:\AI-workspace\.dsh\sessions\--E-AI-workspace-DSH~0020sp-~667A~8111~9879~76EE~533A--\296a3beb-9370-4367-a84a-c677a1ff509e\session.v4.jsonl.zstd
-```
-
-## 涉及代码
-
-- `src/watch/agent-probe.js`：探针。做四件事：
-  1. `ctx.get('agents')`、`ctx.get('agentPresets')`；
-  2. `presets.resolve('minimal')` / `mount(agentCtx, id)`；
-  3. `ctx.agents.currentInitiator()` 作为 `parentAgent`；
-  4. `agents.create()` + `agent.followup()` + `whenIdle()`，在 `setup` 里监听 `agent/assistant-stream` 收 `text-delta`。
-- 入口：`watch_run action=agent_probe`（**没有**新增工具名，原因见下）。
-- 相关提交：
-  - `6b4bd1c` 初版探针（新增 `watch_agent_probe` 工具）
-  - `9e2a84e` 挂 standard preset
-  - `cd63dac` 加 parentAgent
-  - `adb60c2` 改 minimal preset
-
-## 两个宿主层“坑”（接手必读）
-
-1. **新增工具名不会生效**  
-   在运行中的宿主里给 `registerWatchTools` 增加新工具（如 `watch_suggest`、`watch_agent_probe`），即使 disable/enable 插件也不会出现；`ctx.tools.register` 到第 6 个就断，后面的都没有。  
-   **规避**：把功能挂到已存在的 `watch_run` 的 `action` 上。当前 `watch_run` 支持 `dry/suggest/agent_probe`。
-
-2. **插件代码改动需要完整重启宿主**  
-   `plugin_manager` 的 disable/enable 只重新挂载已加载模块，不重新 import 代码。  
-   必须完全退出 DSH 宿主（托盘退出/任务管理器结束所有 `DeepSeek Harness` 进程）再打开；只关窗口或刷新页面不算。  
-   判断是否真的重启：`Get-CimInstance Win32_Process -Filter "Name='DeepSeek Harness.exe'"` 看 `dsh-desktop-host` 的 `CreationDate` 是否晚于代码文件 mtime。
-
-3. **`package.json` 不要用 PowerShell `Set-Content` 写**  
-   会带 UTF-8 BOM，loader 解析失败会**静默丢掉整个插件**（设置页签和工具一起消失）。用 `[System.IO.File]::WriteAllText(..., New-Object System.Text.UTF8Encoding($false))`。
-
-## 给接手 AI 的建议方向（按优先级）
-
-1. **先读正常 subagent 的创建路径**  
-   读 `@deepseek-ai/dsh-tool-subagent`（app.asar 内）如何调用 `agents.create`：它传了哪些 `agentOptions`、`setup`、`parentAgent`、`meta`，以及是否额外安装了 provider/transport 相关插件。把它的组合**逐项对齐**到 `agent-probe.js`，这是最可能直接修好的路。
-
-2. **检查 provider 是否属于“宿主级服务”**  
-   `deepseek-account` 可能依赖宿主进程里的账号桥接，而新 agent 的 ctx 里没有这个桥接。可试：
-   - 在 preset 里显式挂载 `@deepseek-ai/dsh-deepseek-account-platform`（或对应 provider 插件）；
-   - 或用 `ctx.llm` 的实际适配器/路由对象，而不是只传 `{provider, model}` 字符串；
-   - 或让子会话继承父会话的 `llm` 服务（`ctx.agents.create` 的 setup 里挂一个转发工具/provider）。
-
-3. **做最小化隔离实验**  
-   在 `agents.create` 的 `setup` 里，直接用该会话的 `llm` 服务发一次 `stream({messages:[{role:'user',text:'收到'}]})`，看是否也 TRANSPORT：
-   - 如果 `ctx.llm` 直连成功 → 问题在 agent loop 的请求组装（工具/系统提示/上下文）；
-   - 如果直连也失败 → 问题在 provider/transport 的会话绑定。
-
-4. **保底方案**  
-   如果上述都不通，`agent` 档保持“自动降级 code”，P5 用 code 档 + 工具白名单实现；不要为了 agent 档阻塞 P5/P8。当前 `agent` 按钮已明确：切到 `agent` 时自动跑仍走 code，并写日志。
-
-## 当前产品状态（交接后可直接继续）
-
-- `code` 档完整可用；调度器 19:00–22:00 随机跑，30% 开摆，错过不补；
-- 悬浮球「待判 / 关注建议」、关注按钮、评论条数滑块都已上线；
-- 队列 0 待判；关注建议 1 条（惊叹号diy电脑）；
-- 全量测试 110/110；工作区干净（以 `git status` 为准）。
-
-## 复现命令
-
-```powershell
-# 1. 确认宿主已完整重启（CreationDate 晚于代码 mtime）
-Get-CimInstance Win32_Process -Filter "Name='DeepSeek Harness.exe'" |
-  Where-Object { $_.CommandLine -match 'dsh-desktop-host' } |
-  Select-Object ProcessId,CreationDate
-
-# 2. 调探针（在 DSH 会话里）
-#    watch_run { "action": "agent_probe" }
-
-# 3. 看该会话日志
-#    E:\AI-workspace\.dsh\sessions\--E-AI-workspace-DSH~0020sp-dsh-neocortex-.data--\<sessionId>\
-```
-
-**如果修好，请把结论补回 `docs/p4.5-follow.md`，并把 `agent-probe.js` 的 preset 从 `minimal` 改成最终的只读 preset。**
+1. 用 `plugin_manager` 对当前工作树执行一次 bundle 安装，使 `preset-watch-duty` 进入 Host 组合；确认没有版本/引擎错误。
+2. 完整退出并重开 DSH（不是只刷新网页，也不是 disable/enable）。
+3. 调 `watch_run {action:'agent_probe'}`：要求 `ok:true`、`setup.presetId='watch-duty'`、`setup.toolNames=[]`、turn completed。
+4. 调 `watch_run {action:'agent_probe',provider:'deepseek-account',model:'deepseek-flash'}` 复测旧路由；失败则记录为路由特有问题，不影响当前可用路由的结论。
+5. 面板切到 agent，跑一次 `watch_run {action:'dry',deep:1}`。检查真实 session request 工具恰好四个、无个人记忆注入、无写工具调用，日报/JSONL/queue 存在且字段同构，临时 agent 最终 dispose。
+6. 若 agent 在提交前失败，允许显式 code 降级，但结果必须有 `degraded`；不能把降级结果当成 agent 验收成功。
+7. 验收通过后再继续 P5（互动/隐私）与 P8（发布）；验证过程不实际发评论、私信或关注。

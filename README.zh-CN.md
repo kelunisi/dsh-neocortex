@@ -46,14 +46,14 @@ Agent 获得三个工具：
 
 ## 喂养模块（v0.5 开发中）
 
-v0.5 在同一插件内新增 `src/watch/` 喂养模块，默认关闭。当前进度：P1 骨架 + P2 数据层。
+v0.5 在同一插件内新增 `src/watch/` 喂养模块，默认关闭。
 
 - 在 **设置 → 插件 → 智脑 → 喂养** 切换 `off / code / agent` 三档，状态写入 `<dataDir>/watch.json`；
 - `off` 时零行为：不起进程、不花 token、不抓取、不写文件；
-- P2 起可用两个工具做首次配置：
-  - `watch_selftest`（`action: "install"`）创建 venv 并安装 B 站 MCP 依赖，然后体检 Python / 脚本 / 依赖 / 登录态 / ffmpeg；
-  - `watch_login`（`action: "start"` / `"poll"`）扫码登录，凭证保存在 `<dataDir>/watch/bili-mcp/bili_credential.json`，权限收紧到当前用户。
-- 抓取、判据、待确认队列、评论/私信与隐私闸从 P3 起逐步接入；`agent` 档位等待 P4.5 的 preset 装配，结论见 [`docs/p0-agent-mode.md`](docs/p0-agent-mode.md)。
+- `watch_selftest`（`action: "install"`）创建 venv、安装 B 站 MCP 依赖并做五项检查；`watch_login` 扫码登录，凭证仅当前用户可读；
+- 两种模式都产出同一种日报 Markdown、JSONL 和待确认队列；跑轮不发送评论、私信或关注，队列接受是单独动作；
+- `code` 由代码抓取、模型判读；`agent` 挂载 `watch-duty`，先用 `tools.restrict({ allow: [] })` 清空继承工具，再只提供四个有界的 B 站只读工具。候选和字幕证据由代码复核，失败会显式标记，只有提交产物前的失败才允许降级 `code`；
+- `watch_run` 支持 `dry`、`suggest` 和严格 `agent_probe`；探针必须同时满足 completed、回复“收到”、可见工具为 0 才通过。
 
 ## 卸载
 

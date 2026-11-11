@@ -88,7 +88,7 @@ export class WatchService {
         scheduler: false,
         harvest: false,
         interaction: false,
-        agentMode: 'planned',
+        agentMode: 'ready',
       },
       note: 'P1 骨架：开关能存能读；调度、抓取、发送均未接入。',
     };

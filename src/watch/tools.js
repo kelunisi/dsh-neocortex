@@ -14,7 +14,7 @@ import { runAgentProbe } from './agent-probe.js';
 import { loginPoll, loginStart, qrDataUrl, renderQrPng, saveCredential } from './login.js';
 import { credentialFile, readCredential, resolvePython, venvPython } from './python.js';
 import { loadQueue, saveQueue } from './queue.js';
-import { runDryRound } from './round.js';
+import { runWatchRound } from './runner.js';
 import { runSelftest } from './selftest.js';
 import { defaultVendorDir } from './bili.js';
 
@@ -118,6 +118,8 @@ function createRunTool(context) {
         action: { type: 'string', enum: ['dry', 'suggest', 'agent_probe'], description: 'dry 跑一轮；suggest 生成关注建议；agent_probe 验证 agent 会话。' },
         queries: { type: 'array', items: { type: 'string' }, description: '可选：覆盖判据里的搜索词。' },
         deep: { type: 'integer', minimum: 1, maximum: 5, description: '可选：深读条数，默认 3。' },
+        provider: { type: 'string', description: 'agent_probe 可选：与 model 一起指定临时路由，不修改部署默认值。' },
+        model: { type: 'string', description: 'agent_probe 可选：与 provider 一起指定临时路由。' },
         limit: { type: 'integer', minimum: 1, maximum: 10, description: 'suggest 时最多返回几条，默认 5。' },
       },
       additionalProperties: false,
@@ -129,7 +131,11 @@ function createRunTool(context) {
     execute: async (args, exec) => {
       try {
         if (args?.action === 'agent_probe') {
-          return sanitize(await runAgentProbe({ ctx: context.ctx, dataDir: context.dataDir, config: context.config }));
+          const config = {
+            ...context.config,
+            ...(args?.provider && args?.model ? { provider: args.provider, model: args.model } : {}),
+          };
+          return sanitize(await runAgentProbe({ ctx: context.ctx, dataDir: context.dataDir, config, signal: exec?.signal }));
         }
         if (args?.action === 'suggest') {
           let followings = [];
@@ -149,14 +155,16 @@ function createRunTool(context) {
           saveSuggestions(context.dataDir, { items });
           return sanitize({ ok: true, action: 'suggest', count: items.length, followings: followings.length, items, warning });
         }
-        if (!context.watch?.enabled?.()) return sanitize({ ok: false, reason: 'mode-off', message: '喂养开关是 off；先在面板切到 code 模式。' });
-        const result = await runDryRound({
+        if (!context.watch?.enabled?.()) return sanitize({ ok: false, reason: 'mode-off', message: '喂养开关是 off；先在面板切到 code 或 agent 模式。' });
+        const result = await runWatchRound({
+          mode: context.watch?.mode,
           ctx: context.ctx,
           dataDir: context.dataDir,
           config: {
             ...context.config,
+            ...context.watch?.config,
             queries: args?.queries,
-            deepPerRound: args?.deep ?? context.config?.deepPerRound,
+            deepPerRound: args?.deep ?? context.watch?.config?.deepPerRound ?? context.config?.deepPerRound,
           },
           vendorDir: context.vendorDir,
           signal: exec?.signal,

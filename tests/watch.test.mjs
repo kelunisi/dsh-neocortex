@@ -23,7 +23,7 @@ test('WATCH-01 a fresh data dir starts off and creates nothing at construction',
   assert.equal(state.phase, 'P1');
   assert.equal(state.mode, 'off');
   assert.deepEqual(state.modes, ['off', 'code', 'agent']);
-  assert.deepEqual(state.capabilities, { scheduler: false, harvest: false, interaction: false, agentMode: 'planned' });
+  assert.deepEqual(state.capabilities, { scheduler: false, harvest: false, interaction: false, agentMode: 'ready' });
 });
 
 test('WATCH-02 switching mode persists atomically and a restart reads it back', () => {
