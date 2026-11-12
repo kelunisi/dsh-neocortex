@@ -10,6 +10,7 @@ import { WatchScheduler } from './scheduler.js';
 import { remainingBudget } from './budget.js';
 import { pendingItems, loadQueue } from './queue.js';
 import { runWatchRound } from './runner.js';
+import { runAutoComments } from './auto-comments.js';
 import { registerWatchTools } from './tools.js';
 
 /**
@@ -29,15 +30,31 @@ export function mountWatch({ ctx, dataDir, initialMode, config = {}, vendorDir, 
     pendingCount: () => pendingItems(loadQueue(dataDir)).length,
     budgetRemaining: () => remainingBudget(dataDir, watch.config.tokenBudgetPerDay ?? 2000000),
     log: (line) => console.error('[watch]', line),
-    run: async () => runWatchRound({
-      mode: watch.mode,
-      watch,
-      ctx,
-      dataDir,
-      config,
-      vendorDir,
-      log: (line) => console.error('[watch]', line),
-    }),
+    run: async () => {
+      const result = await runWatchRound({
+        mode: watch.mode,
+        watch,
+        ctx,
+        dataDir,
+        config,
+        vendorDir,
+        log: (line) => console.error('[watch]', line),
+      });
+      let autoComments;
+      try {
+        autoComments = await runAutoComments({
+          ctx,
+          dataDir,
+          config: { ...config, ...(watch.config || {}) },
+          vendorDir,
+          log: (line) => console.error('[watch]', line),
+        });
+      } catch (error) {
+        autoComments = { ok: false, error: String(error?.message || error).slice(0, 300) };
+        console.error('[watch] 自动评论失败', error);
+      }
+      return { ...result, autoComments };
+    },
   });
   if (ctx && typeof ctx.effect === 'function') {
     ctx.effect(() => () => {
