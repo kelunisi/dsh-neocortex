@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智脑 1.0 · 功能与状态</title>
+<style>
+  :root{
+    --bg:#07090f; --bg-2:#0b0f19; --panel:rgba(255,255,255,.045);
+    --line:rgba(255,255,255,.09); --text:#eef2ff; --muted:#98a2b8;
+    --mint:#7cf7d4; --violet:#9aa8ff; --amber:#ffc46b; --rose:#ff8ca1;
+    --radius:20px;
+  }
+  [data-theme="light"]{
+    --bg:#f4f6fb; --bg-2:#eef2f9; --panel:rgba(255,255,255,.78);
+    --line:rgba(16,24,40,.10); --text:#0f172a; --muted:#5b667a;
+    --mint:#0f9f7f; --violet:#5563d6; --amber:#b96b00; --rose:#c23b59;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; color:var(--text); background:var(--bg);
+    font-family:"Inter","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    line-height:1.65; -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(900px 600px at 12% -8%, rgba(124,247,212,.13), transparent 60%),
+      radial-gradient(1000px 700px at 88% 0%, rgba(154,168,255,.16), transparent 62%),
+      radial-gradient(900px 700px at 50% 100%, rgba(255,140,161,.08), transparent 60%),
+      linear-gradient(180deg,var(--bg),var(--bg-2));
+  }
+  body::after{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.35;
+    background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+    background-size:72px 72px;
+    mask-image:radial-gradient(circle at 50% 20%,black,transparent 78%);
+  }
+  .wrap{width:min(1180px,calc(100% - 40px)); margin:0 auto}
+  header.top{
+    position:sticky; top:0; z-index:20; backdrop-filter:blur(18px);
+    background:color-mix(in srgb,var(--bg) 72%,transparent);
+    border-bottom:1px solid var(--line);
+  }
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:18px; padding:14px 0}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.02em}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--mint);box-shadow:0 0 18px var(--mint)}
+  .nav{display:flex; gap:18px; flex-wrap:wrap; font-size:13px}
+  .nav a{color:var(--muted); text-decoration:none; transition:.2s}
+  .nav a:hover{color:var(--text)}
+  .theme-btn{
+    border:1px solid var(--line); background:var(--panel); color:var(--text);
+    border-radius:999px; padding:7px 12px; cursor:pointer; font-size:12px;
+  }
+  .hero{position:relative; padding:92px 0 48px; overflow:hidden}
+  .hero .kicker{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:22px}
+  .chip{
+    display:inline-flex; align-items:center; gap:7px; padding:6px 11px; border-radius:999px;
+    border:1px solid var(--line); background:var(--panel); color:var(--muted);
+    font-size:12px; letter-spacing:.02em;
+  }
+  .chip b{color:var(--text); font-weight:600}
+  .hero-grid{display:grid; grid-template-columns:1.35fr .65fr; gap:34px; align-items:end}
+  h1{font-size:clamp(44px,7vw,86px); line-height:1.02; letter-spacing:-.045em; margin:0 0 18px}
+  h1 .grad{background:linear-gradient(92deg,var(--mint),var(--violet) 58%,var(--rose)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .lede{max-width:660px; color:var(--muted); font-size:clamp(15px,1.6vw,18px); margin:0}
+  .watermark{
+    position:absolute; right:-2%; top:26px; font-size:clamp(140px,24vw,300px); font-weight:800;
+    letter-spacing:-.1em; color:transparent; -webkit-text-stroke:1px color-mix(in srgb,var(--text) 10%,transparent);
+    pointer-events:none; user-select:none;
+  }
+  .ring{
+    justify-self:end; width:190px; height:190px; border-radius:50%; padding:14px;
+    background:conic-gradient(var(--mint) 0 78%, rgba(255,255,255,.08) 78% 100%);
+    display:grid; place-items:center; position:relative;
+  }
+  [data-theme="light"] .ring{background:conic-gradient(var(--mint) 0 78%, rgba(16,24,40,.08) 78% 100%)}
+  .ring::before{content:""; position:absolute; inset:12px; border-radius:50%; background:var(--bg)}
+  .ring .inner{position:relative; text-align:center}
+  .ring strong{display:block; font-size:40px; line-height:1; letter-spacing:-.04em}
+  .ring span{font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase}
+  section{padding:64px 0; border-top:1px solid var(--line)}
+  .section-head{display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin-bottom:28px}
+  .eyebrow{font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--mint); margin-bottom:8px}
+  h2{font-size:clamp(26px,3.4vw,40px); letter-spacing:-.03em; line-height:1.15; margin:0}
+  .section-head p{margin:0; max-width:520px; color:var(--muted); font-size:14px}
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
+  .stat{
+    padding:22px; border:1px solid var(--line); border-radius:var(--radius);
+    background:linear-gradient(180deg,var(--panel),transparent);
+  }
+  .stat b{display:block; font-size:34px; letter-spacing:-.04em; line-height:1.1}
+  .stat span{font-size:12px; color:var(--muted)}
+  .cards{display:grid; grid-template-columns:repeat(3,1fr); gap:16px}
+  .card{
+    padding:24px; border:1px solid var(--line); border-radius:var(--radius);
+    background:linear-gradient(180deg,var(--panel),transparent);
+    transition:transform .25s ease, border-color .25s ease, background .25s ease;
+  }
+  .card:hover{transform:translateY(-4px); border-color:color-mix(in srgb,var(--mint) 45%,var(--line))}
+  .icon{
+    width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+    border:1px solid var(--line); background:rgba(124,247,212,.08); color:var(--mint);
+    font-weight:700; font-size:15px; margin-bottom:16px;
+  }
+  .card h3{margin:0 0 8px; font-size:17px; letter-spacing:-.01em}
+  .card p{margin:0; color:var(--muted); font-size:13.5px}
+  .tags{display:flex; flex-wrap:wrap; gap:7px; margin-top:16px}
+  .tag{font-size:11px; color:var(--muted); border:1px solid var(--line); padding:3px 8px; border-radius:999px}
+  .flow{
+    display:grid; grid-template-columns:repeat(6,1fr); gap:10px; align-items:stretch;
+  }
+  .step{
+    position:relative; padding:16px 14px; border:1px solid var(--line); border-radius:14px;
+    background:var(--panel); min-height:104px;
+  }
+  .step .num{font-size:10px; color:var(--mint); letter-spacing:.14em}
+  .step h4{margin:8px 0 6px; font-size:13.5px}
+  .step p{margin:0; font-size:11.5px; color:var(--muted)}
+  .status-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+  .status-box{border:1px solid var(--line); border-radius:var(--radius); padding:24px; background:var(--panel)}
+  .status-box h3{margin:0 0 14px; font-size:16px; display:flex; align-items:center; gap:9px}
+  .status-box ul{list-style:none; margin:0; padding:0; display:grid; gap:10px}
+  .status-box li{display:flex; gap:10px; font-size:13px; color:var(--muted)}
+  .status-box li b{color:var(--text); font-weight:600}
+  .ok{color:var(--mint)} .wait{color:var(--amber)} .no{color:var(--rose)}
+  .table-wrap{overflow:auto; border:1px solid var(--line); border-radius:var(--radius)}
+  table{width:100%; border-collapse:collapse; min-width:760px; font-size:13px}
+  th,td{text-align:left; padding:13px 16px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); background:rgba(255,255,255,.025)}
+  tr:last-child td{border-bottom:0}
+  .pill{display:inline-block; font-size:11px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); white-space:nowrap}
+  .pill.done{color:var(--mint); border-color:rgba(124,247,212,.35); background:rgba(124,247,212,.07)}
+  .pill.doing{color:var(--amber); border-color:rgba(255,196,107,.35); background:rgba(255,196,107,.08)}
+  .pill.drop{color:var(--rose); border-color:rgba(255,140,161,.35); background:rgba(255,140,161,.08)}
+  .features{display:grid; grid-template-columns:repeat(2,1fr); gap:16px}
+  .feature{padding:22px; border-radius:18px; border:1px solid var(--line); background:linear-gradient(135deg,var(--panel),transparent)}
+  .feature .big{font-size:26px; letter-spacing:-.03em; font-weight:700; margin-bottom:6px}
+  .feature p{margin:0; color:var(--muted); font-size:13px}
+  .timeline{display:grid; gap:0; border-left:1px solid var(--line); margin-left:8px}
+  .tl{position:relative; padding:0 0 26px 26px}
+  .tl::before{content:""; position:absolute; left:-5px; top:6px; width:9px;height:9px;border-radius:50%; background:var(--mint); box-shadow:0 0 14px var(--mint)}
+  .tl.pending::before{background:var(--amber); box-shadow:0 0 14px var(--amber)}
+  .tl.dropped::before{background:var(--rose); box-shadow:0 0 14px var(--rose)}
+  .tl h4{margin:0 0 4px; font-size:14px}
+  .tl p{margin:0; color:var(--muted); font-size:12.5px}
+  .note{font-size:12px; color:var(--muted); margin-top:18px}
+  footer{padding:38px 0 60px; border-top:1px solid var(--line); color:var(--muted); font-size:12px}
+  .foot{display:flex; justify-content:space-between; gap:18px; flex-wrap:wrap}
+  .reveal{animation:rise .7s ease both}
+  @keyframes rise{from{opacity:0; transform:translateY(14px)}to{opacity:1; transform:none}}
+  @media (max-width:920px){
+    .hero-grid{grid-template-columns:1fr} .ring{justify-self:start}
+    .cards{grid-template-columns:1fr 1fr} .stats{grid-template-columns:1fr 1fr}
+    .flow{grid-template-columns:1fr 1fr} .status-grid{grid-template-columns:1fr}
+    .features{grid-template-columns:1fr}
+  }
+  @media (max-width:560px){
+    .cards,.stats,.flow{grid-template-columns:1fr} .nav{display:none}
+    h1{font-size:44px}
+  }
+  @media print{
+    body{background:#fff;color:#111} body::before,body::after{display:none}
+    header.top,.theme-btn{display:none} section{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap topbar">
+    <div class="brand"><span class="dot"></span> 智脑 <span style="color:var(--muted);font-weight:500">dsh-neocortex</span></div>
+    <nav class="nav">
+      <a href="#overview">总览</a>
+      <a href="#features">功能</a>
+      <a href="#flow">流程</a>
+      <a href="#status">完成度</a>
+      <a href="#character">特色</a>
+      <a href="#next">下一步</a>
+    </nav>
+    <button class="theme-btn" id="themeBtn" type="button">切换主题</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero" id="overview" style="border-top:0">
+    <div class="watermark">1.0</div>
+    <div class="kicker">
+      <span class="chip">版本 <b>1.0.0</b></span>
+      <span class="chip">状态 <b>本地可运行</b></span>
+      <span class="chip">日期 <b>2026-11-12</b></span>
+    </div>
+    <div class="hero-grid">
+      <div>
+        <h1>会读，<br><span class="grad">也会写。</span></h1>
+        <p class="lede">它不再只是一个“记忆库”。新会话里，它先回忆你的个人模型和知识库；每天，它自己去 B 站看视频、读评论、写回复，再把值得留下的东西写回 Obsidian。</p>
+      </div>
+      <div class="ring" aria-label="整体完成度约 78%">
+        <div class="inner"><strong>78%</strong><span>v1.0 完成度</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="数据">
+    <div class="stats">
+      <div class="stat"><b>154</b><span>自动化测试通过</span></div>
+      <div class="stat"><b>1×</b><span>每天自动喂养一轮</span></div>
+      <div class="stat"><b>2</b><span>层写入：L2 来源页 + L3 近况</span></div>
+      <div class="stat"><b>3/3</b><span>今日评论额度已真实发送</span></div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="section-head">
+      <div><div class="eyebrow">Capabilities</div><h2>六个面，拼成一个“会养成的第二大脑”</h2></div>
+      <p>不是功能堆叠：读、写、自动、安全、观察、本地，六件事互相咬合。</p>
+    </div>
+    <div class="cards">
+      <article class="card">
+        <div class="icon">读</div>
+        <h3>回忆：先懂你，再回答</h3>
+        <p>新会话前 4 轮自动检索个人模型、知识库与近况；首轮带个人名片与最多 3 页知识，后续按问题补。</p>
+        <div class="tags"><span class="tag">R1</span><span class="tag">知识库索引</span><span class="tag">L1/L2/L3</span></div>
+      </article>
+      <article class="card">
+        <div class="icon">写</div>
+        <h3>喂养：每天自己去看 B 站</h3>
+        <p>按你的方向搜视频、深读 2–3 条、进待判队列；你点“收”后写 L2 来源摘要与 L3 近况，重复来源自动去重。</p>
+        <div class="tags"><span class="tag">代码模式</span><span class="tag">深读</span><span class="tag">队列</span></div>
+      </article>
+      <article class="card">
+        <div class="icon">关</div>
+        <h3>关注：建议你关注谁</h3>
+        <p>读关注列表、按方向聚合打分、生成 3–5 个建议；悬浮球里点“关注”才真的关注，一次一个。</p>
+        <div class="tags"><span class="tag">只读采集</span><span class="tag">点头才写</span><span class="tag">不自动关注</span></div>
+      </article>
+      <article class="card">
+        <div class="icon">评</div>
+        <h3>评论：淘金 + 自动回复</h3>
+        <p>从已收视频评论区挑问题/纠错/高赞；模型写 ≤60 字回复，自动 @ 自己，过隐私闸和每日额度后发送。</p>
+        <div class="tags"><span class="tag">自动</span><span class="tag">@ 我</span><span class="tag">失败即停</span></div>
+      </article>
+      <article class="card">
+        <div class="icon">盾</div>
+        <h3>安全：默认不越界</h3>
+        <p>MCP 只读工具白名单；写操作仅关注与评论——关注需点头，评论过隐私和额度；412 立即停，不重试。</p>
+        <div class="tags"><span class="tag">隐私闸</span><span class="tag">额度</span><span class="tag">注入边界</span></div>
+      </article>
+      <article class="card">
+        <div class="icon">观</div>
+        <h3>观察：每一步都看得见</h3>
+        <p>设置页「喂养」、右下角悬浮球、待判/关注建议两个标签、每日评论报告、调度器状态与预算。</p>
+        <div class="tags"><span class="tag">悬浮球</span><span class="tag">报告</span><span class="tag">预算</span></div>
+      </article>
+    </div>
+  </section>
+
+  <section id="flow">
+    <div class="section-head">
+      <div><div class="eyebrow">One loop</div><h2>一天是这样跑起来的</h2></div>
+      <p>视频扫描、评论淘金、草稿和发送已自动；关注仍保留一个“人点头”的闸。</p>
+    </div>
+    <div class="flow">
+      <div class="step"><div class="num">01 / 19:00–22:00</div><h4>自动醒</h4><p>谷时窗口随机一刻，30% 概率开摆；错过不补跑。</p></div>
+      <div class="step"><div class="num">02 / 搜索</div><h4>看 5 条</h4><p>按判据搜视频，关注 UP 预留 1 个名额。</p></div>
+      <div class="step"><div class="num">03 / 深读</div><h4>读 2–3 条</h4><p>字幕 + 模型判读，提炼要点与置信度。</p></div>
+      <div class="step"><div class="num">04 / 人判</div><h4>你收/扔</h4><p>悬浮球里逐条确认；收才写智脑。</p></div>
+      <div class="step"><div class="num">05 / 写入</div><h4>L2 + L3</h4><p>来源摘要页 + 近况一条；重复来源跳过。</p></div>
+      <div class="step"><div class="num">06 / 评论</div><h4>自动回复</h4><p>淘评论 → 草稿 → @我 → 隐私/额度 → 发送。</p></div>
+    </div>
+    <p class="note">注：评论自动链路在“定时轮跑完”后触发；关注动作仍由你在悬浮球里点。</p>
+  </section>
+
+  <section id="status">
+    <div class="section-head">
+      <div><div class="eyebrow">Status</div><h2>完成了什么，没完成什么</h2></div>
+      <p>截至 2026-11-12；1.0 包已打，发布动作未执行。</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>阶段</th><th>内容</th><th>状态</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>P0</td><td>宿主能力验证</td><td><span class="pill done">完成</span></td><td>preset/agents 可行；agent 后来放弃。</td></tr>
+          <tr><td>P1</td><td>插件骨架 / off-code 开关</td><td><span class="pill done">完成</span></td><td>状态持久化、原子写。</td></tr>
+          <tr><td>P2</td><td>B 站数据层</td><td><span class="pill done">完成</span></td><td>只读 MCP、扫码登录、体检。</td></tr>
+          <tr><td>P3 / 3.5</td><td>跑一轮 / 质量校准</td><td><span class="pill done">完成</span></td><td>校准后 5/5 全收。</td></tr>
+          <tr><td>P4</td><td>入库桥</td><td><span class="pill done">完成</span></td><td>L2 来源页 + L3 近况；去重、重试。</td></tr>
+          <tr><td>R1</td><td>回忆机制</td><td><span class="pill done">完成</span></td><td>前 4 轮按问题检索；已降噪。</td></tr>
+          <tr><td>P4.5</td><td>关注建议 / 关注</td><td><span class="pill done">完成</span></td><td>建议 + 点击关注；agent 档放弃。</td></tr>
+          <tr><td>P6</td><td>自动调度</td><td><span class="pill done">完成</span></td><td>19–22 点、30% 开摆、预算闸。</td></tr>
+          <tr><td>P7</td><td>面板 / 悬浮球</td><td><span class="pill done">完成</span></td><td>待判、关注建议、三滑块、预算。</td></tr>
+          <tr><td>P8</td><td>安全与测试</td><td><span class="pill done">完成</span></td><td>隐私、额度、写工具白名单、注入。</td></tr>
+          <tr><td>P5</td><td>评论淘金 / 自动回复</td><td><span class="pill doing">已接，待首个定时轮验收</span></td><td>手动 3/3 已真实发送；自动链路随下一次定时轮跑。</td></tr>
+          <tr><td>P9</td><td>1.0 发布</td><td><span class="pill doing">打包完成，发布未授权</span></td><td><code>dsh-neocortex-1.0.0.tgz</code> 已生成；GitHub/npm/市场未提交。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="status-grid">
+      <div class="status-box">
+        <h3><span class="ok">✓</span> 已经能用</h3>
+        <ul>
+          <li><b>读：</b>新会话回忆个人模型 + 知识库，按问题检索。</li>
+          <li><b>写：</b>B 站视频 → 队列 → L2 来源页 + L3 近况。</li>
+          <li><b>自动：</b>每天一轮、评论自动回复、额度/隐私/失败停。</li>
+          <li><b>关注：</b>建议 + 点击关注，一次一个。</li>
+          <li><b>观察：</b>悬浮球、设置页、日报、预算、调度状态。</li>
+        </ul>
+      </div>
+      <div class="status-box">
+        <h3><span class="wait">…</span> 还没完成 / 已知边界</h3>
+        <ul>
+          <li><b>自动评论验收：</b>还要等下一次定时轮，确认真实自动发送。</li>
+          <li><b>1.0 发布：</b>包已打，GitHub / npm / 市场都需要你逐项授权。</li>
+          <li><b>agent 档：</b>已放弃；面板只保留关闭 / 代码模式。</li>
+          <li><b>UI 细节：</b>悬浮球拖动、历史分页还没做。</li>
+          <li><b>互动范围：</b>私信、陌生人回复未做；当前只做已收视频评论区。</li>
+          <li><b>隐私正则：</b>覆盖常见格式，不保证 100%；P5 前仍需人工抽检。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="character">
+    <div class="section-head">
+      <div><div class="eyebrow">Why it feels different</div><h2>它和“普通记忆插件”不一样的地方</h2></div>
+      <p>不是把聊天记录塞进向量库，而是把“读”和“写”接成一个闭环。</p>
+    </div>
+    <div class="features">
+      <div class="feature"><div class="big">01 · 读写闭环</div><p>回忆决定它“懂你”，喂养决定它“长出新东西”；写回 Obsidian 的 L2/L3 又成为下一次回忆的素材。</p></div>
+      <div class="feature"><div class="big">02 · 本地优先</div><p>记忆是 Markdown，账本是本地 JSON；不上传云端，不依赖外部记忆服务。</p></div>
+      <div class="feature"><div class="big">03 · 自动但不失控</div><p>自动看、自动写草稿、自动发；但隐私闸、每日额度、失败即停、关注需点头，四道闸都在。</p></div>
+      <div class="feature"><div class="big">04 · 可解释</div><p>为什么收、为什么发、用了多少 token、下次什么时候跑，都能在面板和报告里看到。</p></div>
+      <div class="feature"><div class="big">05 · 人机分工</div><p>机器负责扫、读、写草稿；人保留“这条要不要进脑子”和“这个人要不要关注”的最终判断。</p></div>
+      <div class="feature"><div class="big">06 · 会自己停</div><p>预算用完、风控 412、账号异常、隐私命中，都会停；不重试、不硬发、不装作成功。</p></div>
+    </div>
+  </section>
+
+  <section id="next">
+    <div class="section-head">
+      <div><div class="eyebrow">Next</div><h2>从 1.0 再往后</h2></div>
+      <p>先把 1.0 跑稳，再谈“更聪明”。</p>
+    </div>
+    <div class="timeline">
+      <div class="tl"><h4>现在 · 1.0 本地可用</h4><p>读写闭环、自动评论、隐私闸、悬浮球、每日调度；1.0 包已打。</p></div>
+      <div class="tl pending"><h4>下一步 · 1.0 发布</h4><p>安装/卸载回归、README/CHANGELOG 定稿；GitHub、npm、市场逐项授权后再发。</p></div>
+      <div class="tl pending"><h4>之后 · 体验补丁</h4><p>悬浮球拖动、历史分页、设置页看评论建议、自动轮结果通知。</p></div>
+      <div class="tl"><h4>未来 · 更聪明的读写</h4><p>更好的语义回忆、评论质量评估、按主题的周报；不恢复 agent 档。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div><div class="eyebrow">Boundary</div><h2>一句实话</h2></div>
+    </div>
+    <p class="lede" style="max-width:900px">它不是“全自动替你思考”。它只是把你每天本来会刷的那部分信息，先替你看一遍、写一版、放在你面前；真正决定“什么值得留下”的，还是你。</p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>智脑 v1.0 · 功能与状态 · 2026-11-12</span>
+    <span>dsh-neocortex · 本地 Markdown + 本地账本 · 不自动发布</span>
+  </div>
+</footer>
+
+<script>
+  const btn = document.getElementById('themeBtn');
+  const root = document.documentElement;
+  const saved = localStorage.getItem('nc-theme');
+  if (saved) root.dataset.theme = saved;
+  btn.addEventListener('click', () => {
+    root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('nc-theme', root.dataset.theme);
+  });
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) if (entry.isIntersecting) entry.target.classList.add('reveal');
+  }, { threshold: 0.08 });
+  document.querySelectorAll('section, .card, .stat').forEach((el) => observer.observe(el));
+</script>
+</body>
+</html>

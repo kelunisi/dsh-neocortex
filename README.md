@@ -3,15 +3,19 @@
 [![npm version](https://img.shields.io/npm/v/dsh-neocortex)](https://www.npmjs.com/package/dsh-neocortex)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Zhinao (Neocortex) — a Markdown-authoritative second brain for DeepSeek Harness, with a local recall ledger, lifecycle engine, weekly review and a Web panel.
+Zhinao (Neocortex) — a Markdown-authoritative second brain for DeepSeek Harness. It **reads** your personal model and knowledge base, and **writes** back from Bilibili feeding: video notes, recent status, follow suggestions, and comment replies.
 
 ## Features
 
-- **Layered memory (L1/L2/L3)**: L1 long-term model (background, collaboration preferences, task standards) gated by user confirmation; L2 knowledge written automatically with mandatory sources; L3 recent status written directly under daily quotas.
-- **Local ledger with recall explanations**: a crash-conscious local ledger accounts for every recall and write; the Web panel explains why a memory was injected.
-- **Lifecycle & weekly review**: scenes and entries sleep, wake, revive and get promoted by bounded rules; a resumable weekly review queues L1 candidates and sleeping entries for the user.
-- **Web panel**: state, recall explanations, L1-only confirmation, review actions, read-only L2 audit, undo, and six bounded settings sliders.
-- **Blank template initialization / takeover**: first run initializes your brain from a generic, personal-info-free Markdown skeleton, or adopts an existing Zhinao directory without touching its files.
+- **Layered memory (L1/L2/L3)**: L1 long-term model gated by user confirmation; L2 knowledge written with mandatory sources; L3 recent status under daily quotas.
+- **Local recall (R1)**: the first four turns of a new session retrieve the personal model, knowledge pages and recent status by the actual question; `neocortex_recall` also exposes knowledge-only search.
+- **Bilibili feeding (watch)**: daily scheduled search, deep-read, pending queue, one-keystroke accept/drop, then L2 source page + L3 recent entry.
+- **Read/write loop**: followed UPs get a reserved slot; accepted videos feed comment mining; model drafts are automatically sent with an owner mention, privacy gate and daily quota.
+- **Human line**: following an UP still requires a click; comments are automatic by explicit user decision, but privacy/412/budget stop everything.
+- **Local ledger with recall explanations**: every recall and write is accounted for; the panel explains why a memory was injected.
+- **Lifecycle & weekly review**: scenes/entries sleep, wake and revive by bounded rules; a resumable weekly review queues L1 candidates for the user.
+- **Web panel / floating ball**: pending cards, follow suggestions, three budget sliders, scheduler state and comment report.
+- **Blank template initialization / takeover**: first run initializes a generic, personal-info-free Markdown skeleton, or adopts an existing Zhinao directory without touching its files.
 
 ## Requirements
 
