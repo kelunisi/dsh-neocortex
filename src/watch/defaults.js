@@ -19,6 +19,7 @@ export const WATCH_DEFAULTS = Object.freeze({
   dmPerDay: 2,
   followingsPerRound: 10,
   tokenBudgetPerDay: 2000000,
+  ownerMention: '',
 });
 
 // P7 will move these into the panel; the clamps are declared now so the
@@ -78,6 +79,10 @@ export function normalizeWatchConfig(raw) {
   }
   if (source.schema !== undefined && source.schema !== WATCH_SCHEMA) {
     repaired.push(`schema:${String(source.schema)}`);
+  }
+  if (typeof source.ownerMention === 'string') {
+    const name = source.ownerMention.trim().replace(/^@+/, '').slice(0, 40);
+    config.ownerMention = name;
   }
   return { config, repaired };
 }

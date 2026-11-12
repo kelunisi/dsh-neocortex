@@ -40,8 +40,16 @@ export function scoreComment(comment) {
   return score;
 }
 
-export function commentLink(bvid, rpid) {
-  const base = `https://www.bilibili.com/video/${encodeURIComponent(String(bvid || ''))}`;
+/** 每条公开回复都先 @ 自己的账号；没有配置昵称时原样返回。 */
+export function withOwnerMention(text, owner) {
+  const name = String(owner || '').trim().replace(/^@+/, '');
+  const body = String(text || '').trim();
+  if (!name) return body;
+  if (body.startsWith(`@${name}`)) return body;
+  return `@${name} ${body}`;
+}
+
+export function commentLink(bvid, rpid) {  const base = `https://www.bilibili.com/video/${encodeURIComponent(String(bvid || ''))}`;
   return rpid ? `${base}/#reply${encodeURIComponent(String(rpid))}` : base;
 }
 

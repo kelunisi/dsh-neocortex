@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { commentLink, isWorthReplying, renderCommentReport, saveCommentReport, scoreComment } from '../src/watch/comments.js';
+import { commentLink, isWorthReplying, renderCommentReport, saveCommentReport, scoreComment, withOwnerMention } from '../src/watch/comments.js';
 
 test('P5C-01 questions and corrections are worth replying; ads and short comments are not', () => {
   assert.equal(isWorthReplying({ content: '请问 5070 和 5080 选哪个？', like: 1 }), true);
@@ -36,4 +36,10 @@ test('P5C-04 saveCommentReport writes a markdown file', () => {
   const { file } = saveCommentReport({ dataDir, date: '2026-11-11', videos: [], comments: [] });
   assert.equal(fs.existsSync(file), true);
   assert.match(fs.readFileSync(file, 'utf8'), /评论淘金/);
+});
+
+test('P5C-05 every outbound reply starts with the owner mention', () => {
+  assert.equal(withOwnerMention('这条有用', 'kelunisi'), '@kelunisi 这条有用');
+  assert.equal(withOwnerMention('@kelunisi 这条有用', 'kelunisi'), '@kelunisi 这条有用', 'no duplicate owner mention');
+  assert.equal(withOwnerMention('这条有用', ''), '这条有用');
 });
