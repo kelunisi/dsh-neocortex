@@ -80,6 +80,30 @@
   .ring .inner{position:relative; text-align:center}
   .ring strong{display:block; font-size:40px; line-height:1; letter-spacing:-.04em}
   .ring span{font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase}
+  .orb-wrap{
+    position:relative; justify-self:end; width:min(420px,100%); aspect-ratio:1;
+    border-radius:50%; border:1px solid var(--line); overflow:hidden;
+    background:
+      radial-gradient(circle at 38% 30%, rgba(124,247,212,.14), transparent 42%),
+      radial-gradient(circle at 70% 72%, rgba(154,168,255,.18), transparent 46%),
+      radial-gradient(circle at 50% 50%, rgba(255,255,255,.045), transparent 70%);
+    box-shadow:0 0 80px rgba(124,247,212,.08), inset 0 0 80px rgba(0,0,0,.25);
+  }
+  [data-theme="light"] .orb-wrap{box-shadow:0 0 80px rgba(15,159,127,.10), inset 0 0 60px rgba(255,255,255,.65)}
+  #memoryOrb{display:block; width:100%; height:100%; cursor:crosshair; touch-action:none}
+  .orb-hud{
+    position:absolute; left:16px; top:14px; display:flex; gap:18px; pointer-events:none;
+    font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+  }
+  .orb-hud b{display:block; font-size:24px; letter-spacing:-.04em; color:var(--text); line-height:1.15}
+  .orb-tip{
+    position:absolute; left:16px; bottom:14px; right:16px; font-size:11.5px; color:var(--muted);
+    pointer-events:none; text-shadow:0 1px 12px var(--bg);
+  }
+  .orb-caption{
+    position:absolute; right:16px; bottom:14px; font-size:9px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted); opacity:.75; pointer-events:none;
+  }
   section{padding:64px 0; border-top:1px solid var(--line)}
   .section-head{display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin-bottom:28px}
   .eyebrow{font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--mint); margin-bottom:8px}
@@ -152,6 +176,7 @@
   @keyframes rise{from{opacity:0; transform:translateY(14px)}to{opacity:1; transform:none}}
   @media (max-width:920px){
     .hero-grid{grid-template-columns:1fr} .ring{justify-self:start}
+    .orb-wrap{justify-self:start; width:min(360px,100%)}
     .cards{grid-template-columns:1fr 1fr} .stats{grid-template-columns:1fr 1fr}
     .flow{grid-template-columns:1fr 1fr} .status-grid{grid-template-columns:1fr}
     .features{grid-template-columns:1fr}
@@ -173,6 +198,7 @@
     <div class="brand"><span class="dot"></span> 智脑 <span style="color:var(--muted);font-weight:500">dsh-neocortex</span></div>
     <nav class="nav">
       <a href="#overview">总览</a>
+      <a href="#brain">记忆规则</a>
       <a href="#features">功能</a>
       <a href="#flow">流程</a>
       <a href="#status">完成度</a>
@@ -197,8 +223,14 @@
         <h1>会读，<br><span class="grad">也会写。</span></h1>
         <p class="lede">它不再只是一个“记忆库”。新会话里，它先回忆你的个人模型和知识库；每天，它自己去 B 站看视频、读评论、写回复，再把值得留下的东西写回 Obsidian。</p>
       </div>
-      <div class="ring" aria-label="整体完成度约 78%">
-        <div class="inner"><strong>78%</strong><span>v1.0 完成度</span></div>
+      <div class="orb-wrap" aria-label="可交互的 3D 记忆球">
+        <canvas id="memoryOrb"></canvas>
+        <div class="orb-hud">
+          <div><span>记忆分</span><b id="orbScore">0</b></div>
+          <div><span>连击</span><b id="orbStreak">0</b></div>
+        </div>
+        <div class="orb-tip" id="orbTip">点击闪烁的记忆点</div>
+        <div class="orb-caption">3D 点云 · 实时反馈 · 纯本地渲染</div>
       </div>
     </div>
   </section>
@@ -209,6 +241,73 @@
       <div class="stat"><b>1×</b><span>每天自动喂养一轮</span></div>
       <div class="stat"><b>2</b><span>层写入：L2 来源页 + L3 近况</span></div>
       <div class="stat"><b>3/3</b><span>今日评论额度已真实发送</span></div>
+    </div>
+  </section>
+
+  <section id="brain">
+    <div class="section-head">
+      <div><div class="eyebrow">Local memory</div><h2>智脑本体：先有规则，才有“记得住”</h2></div>
+      <p>不是把所有对话塞进数据库；它用 Markdown 分层、账本记账、闸门控制写入，才敢说“这是你的第二大脑”。</p>
+    </div>
+    <div class="cards">
+      <article class="card">
+        <div class="icon">M</div>
+        <h3>Markdown 是唯一权威</h3>
+        <p>记忆是普通 Markdown 文件，Obsidian 能直接打开、能改、能删、能迁移；插件只是读写器，不是数据牢笼。</p>
+        <div class="tags"><span class="tag">本地优先</span><span class="tag">可迁移</span><span class="tag">无厂商锁定</span></div>
+      </article>
+      <article class="card">
+        <div class="icon">L1</div>
+        <h3>长期模型：必须你确认</h3>
+        <p>身份、协作偏好、任务标准只走 L1；候选由周回顾排队，**只有你能确认**，代码不代你点“同意”。</p>
+        <div class="tags"><span class="tag">人工确认</span><span class="tag">稳定信息</span><span class="tag">周回顾</span></div>
+      </article>
+      <article class="card">
+        <div class="icon">L2</div>
+        <h3>知识：强制来源 + 去重</h3>
+        <p>每条知识必须带来源链接；同来源不重复建页；写前先读、原地演进，不拿旧快照整页覆盖。</p>
+        <div class="tags"><span class="tag">来源可追</span><span class="tag">去重</span><span class="tag">只增不覆</span></div>
+      </article>
+      <article class="card">
+        <div class="icon">L3</div>
+        <h3>近况：场景 + 每日配额</h3>
+        <p>近期状态写到场景页；没有场景归属才进「通用」；按天限额，避免“今天发生了什么”把记忆冲爆。</p>
+        <div class="tags"><span class="tag">场景倾向</span><span class="tag">日配额</span><span class="tag">可沉睡</span></div>
+      </article>
+      <article class="card">
+        <div class="icon">R1</div>
+        <h3>回忆：按问题，不按时间倒垃圾</h3>
+        <p>新会话前 4 轮按你的真实问题检索；首轮个人名片 + 最多 3 页知识，后续按需补；同一页整个会话只出现一次。</p>
+        <div class="tags"><span class="tag">前 4 轮</span><span class="tag">预算</span><span class="tag">压缩重开</span></div>
+      </article>
+      <article class="card">
+        <div class="icon">账</div>
+        <h3>账本：每次读写都有解释</h3>
+        <p>本地账本记录每次回忆、写入、候选和撤销；面板能解释“为什么这条被注入”，不是黑盒向量库。</p>
+        <div class="tags"><span class="tag">可解释</span><span class="tag">可撤销</span><span class="tag">崩溃安全</span></div>
+      </article>
+    </div>
+    <div class="status-grid" style="margin-top:18px">
+      <div class="status-box">
+        <h3><span class="ok">✓</span> 本地记忆的规则</h3>
+        <ul>
+          <li><b>先读后写：</b>修改详情页前先读当前内容，原地演进，不整页覆盖。</li>
+          <li><b>分层不越级：</b>L1 只走确认；L2 必须有来源；L3 按配额，不冒充长期知识。</li>
+          <li><b>写入有闸：</b>来源 URL 去重；重复条目跳过；失败重试只补缺的一层。</li>
+          <li><b>回忆有预算：</b>按问题检索，超预算截断；第 5 轮起不主动注入。</li>
+          <li><b>生命周期：</b>场景会睡、会醒、会复活；旧条目不删除，只在索引下沉。</li>
+        </ul>
+      </div>
+      <div class="status-box">
+        <h3><span class="ok">✓</span> 这样做的优点</h3>
+        <ul>
+          <li><b>隐私：</b>记忆留在本地 Markdown，不上传云端。</li>
+          <li><b>可控：</b>你能打开、能改、能删；不是“AI 说记得就记得”。</li>
+          <li><b>可迁移：</b>换电脑、换插件，文件还在 Obsidian 里。</li>
+          <li><b>可解释：</b>为什么想起这条、为什么写这条，都有账可查。</li>
+          <li><b>不失真：</b>旧快照不会被新总结整页覆盖，历史脉络保留。</li>
+        </ul>
+      </div>
     </div>
   </section>
 
@@ -382,6 +481,163 @@
     for (const entry of entries) if (entry.isIntersecting) entry.target.classList.add('reveal');
   }, { threshold: 0.08 });
   document.querySelectorAll('section, .card, .stat').forEach((el) => observer.observe(el));
+
+  // 3D 记忆球：纯 Canvas 点云 + 点击点亮小游戏，不依赖外部模型/库。
+  (() => {
+    const canvas = document.getElementById('memoryOrb');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const N = 190;
+    const points = [];
+    for (let i = 0; i < N; i++) {
+      const y = 1 - (i / (N - 1)) * 2;
+      const r = Math.sqrt(Math.max(0, 1 - y * y));
+      const theta = i * Math.PI * (3 - Math.sqrt(5));
+      points.push({ x: Math.cos(theta) * r, y, z: Math.sin(theta) * r, phase: Math.random() * Math.PI * 2 });
+    }
+    const state = { w: 0, h: 0, dpr: 1, rotX: -0.18, rotY: 0.2, targetRotX: -0.18, targetRotY: 0.2, pointer: 0 };
+    let score = 0, streak = 0, target = Math.floor(Math.random() * N), glowUntil = 0, targetUntil = 0;
+    const ripples = [];
+    const projected = new Array(N);
+    const scoreEl = document.getElementById('orbScore');
+    const streakEl = document.getElementById('orbStreak');
+    const tipEl = document.getElementById('orbTip');
+    const tips = ['点击闪烁的记忆点', '它在等你点亮', '连击会点亮整颗球', '慢慢来，别点空'];
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      state.dpr = Math.min(window.devicePixelRatio || 1, 2);
+      state.w = Math.max(1, rect.width);
+      state.h = Math.max(1, rect.height);
+      canvas.width = Math.round(state.w * state.dpr);
+      canvas.height = Math.round(state.h * state.dpr);
+      ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    function project(p, now) {
+      const cosY = Math.cos(state.rotY), sinY = Math.sin(state.rotY);
+      const cosX = Math.cos(state.rotX), sinX = Math.sin(state.rotX);
+      let x = p.x * cosY - p.z * sinY;
+      let z = p.x * sinY + p.z * cosY;
+      let y = p.y * cosX - z * sinX;
+      z = p.y * sinX + z * cosX;
+      const perspective = 2.7;
+      const scale = perspective / (perspective - z * 0.9);
+      const radius = Math.min(state.w, state.h) * 0.34;
+      const breathe = 1 + Math.sin(now * 0.0013) * 0.012;
+      return {
+        x: state.w / 2 + x * radius * scale * breathe,
+        y: state.h / 2 + y * radius * scale * breathe,
+        z, scale, alpha: 0.22 + (z + 1) * 0.22,
+      };
+    }
+
+    function draw(now) {
+      if (!state.w) resize();
+      state.rotX += (state.targetRotX - state.rotX) * 0.035;
+      state.rotY += (state.targetRotY - state.rotY) * 0.035 + 0.0016;
+      ctx.clearRect(0, 0, state.w, state.h);
+
+      const halo = ctx.createRadialGradient(state.w * 0.5, state.h * 0.48, 0, state.w * 0.5, state.h * 0.48, state.w * 0.55);
+      halo.addColorStop(0, 'rgba(124,247,212,.14)');
+      halo.addColorStop(0.45, 'rgba(154,168,255,.07)');
+      halo.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 0, state.w, state.h);
+
+      for (let i = 0; i < N; i++) projected[i] = project(points[i], now);
+      const order = [...Array(N).keys()].sort((a, b) => projected[a].z - projected[b].z);
+      for (const i of order) {
+        const p = projected[i];
+        const isTarget = i === target;
+        const hot = now < glowUntil && i === target;
+        const pulse = isTarget ? 1 + Math.sin(now * 0.009) * 0.35 : 1;
+        const size = Math.max(0.9, p.scale * (isTarget ? 3.4 : 1.55));
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, size * pulse, 0, Math.PI * 2);
+        if (isTarget) {
+          ctx.fillStyle = `rgba(255,196,107,${0.55 + Math.sin(now * 0.01) * 0.18})`;
+          ctx.shadowColor = 'rgba(255,196,107,.75)';
+          ctx.shadowBlur = 22;
+        } else {
+          const tone = 0.5 + (p.z + 1) * 0.22;
+          ctx.fillStyle = `rgba(124,247,212,${Math.min(0.85, p.alpha)})`;
+          ctx.shadowColor = `rgba(124,247,212,${tone * 0.35})`;
+          ctx.shadowBlur = 8;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        if (isTarget) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, size * 3.4, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(255,196,107,.28)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+
+      // 中心呼吸环
+      const r = Math.min(state.w, state.h) * 0.34;
+      ctx.beginPath();
+      ctx.arc(state.w / 2, state.h / 2, r * 1.02, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,.055)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      for (let i = ripples.length - 1; i >= 0; i--) {
+        const ripple = ripples[i];
+        const age = (now - ripple.at) / 650;
+        if (age >= 1) { ripples.splice(i, 1); continue; }
+        ctx.beginPath();
+        ctx.arc(ripple.x, ripple.y, 8 + age * 54, 0, Math.PI * 2);
+        ctx.strokeStyle = ripple.ok ? `rgba(124,247,212,${(1 - age) * .7})` : `rgba(255,140,161,${(1 - age) * .5})`;
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+      }
+
+      if (now > targetUntil) {
+        target = Math.floor(Math.random() * N);
+        targetUntil = now + 4200;
+      }
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+
+    function move(event) {
+      const rect = canvas.getBoundingClientRect();
+      const nx = (event.clientX - rect.left) / rect.width - 0.5;
+      const ny = (event.clientY - rect.top) / rect.height - 0.5;
+      state.targetRotY = 0.2 + nx * 0.9;
+      state.targetRotX = -0.18 + ny * 0.55;
+    }
+    canvas.addEventListener('pointermove', move);
+    canvas.addEventListener('pointerleave', () => { state.targetRotX = -0.18; state.targetRotY = 0.2; });
+    canvas.addEventListener('pointerdown', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const p = projected[target];
+      const now = performance.now();
+      if (p && Math.hypot(x - p.x, y - p.y) < 28) {
+        score += 1;
+        streak += 1;
+        glowUntil = now + 500;
+        ripples.push({ x: p.x, y: p.y, at: now, ok: true });
+        scoreEl.textContent = String(score);
+        streakEl.textContent = String(streak);
+        tipEl.textContent = streak >= 3 ? '连击！记忆正在成形' : '点亮了。继续找下一个';
+        target = Math.floor(Math.random() * N);
+        targetUntil = now + 4200;
+      } else {
+        streak = 0;
+        streakEl.textContent = '0';
+        ripples.push({ x, y, at: now, ok: false });
+        tipEl.textContent = '差一点，再找找闪烁的点';
+      }
+    });
+  })();
 </script>
 </body>
 </html>
