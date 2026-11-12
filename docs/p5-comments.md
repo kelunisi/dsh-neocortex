@@ -45,6 +45,12 @@
 - 评论链接：https://www.bilibili.com/video/BV1zb4F6qEBy/#reply319904473569
 - 配额：今天已用 **1 / 3**；其余 5 条草稿未发送。
 
+## 第二条（金价标题）发送成功
+
+- B 站返回 `success: true`，新评论 `rpid: 319982040769`，父评论 `319001960737`；
+- 链接：https://www.bilibili.com/video/BV1zb4F6qEBy/#reply319982040769
+- 今天已用 **2 / 3**，只剩 1 条额度；DSH 3 条草稿仍未发。
+
 ## 边界
 
 - 目前**不生成回复**，只淘评论；
